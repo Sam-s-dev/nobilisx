@@ -1,6 +1,6 @@
 # app/main.py
 """
-NOBILIS X — Système Expert de Veille & Analyse des Appels d'Offres.
+NOBILIS X V2 — Système Expert de Veille & Analyse des Appels d'Offres.
 L'intelligence des marchés. La noblesse de l'avance.
 """
 
@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import init_db
-from app.routers import enterprises, tenders, analyses
+from app.routers import enterprises, tenders, analyses, individuals
 from app.scheduler.jobs import init_scheduler, shutdown_scheduler
 
 # Configuration du logging
@@ -75,14 +75,15 @@ L'intelligence des marchés. La noblesse de l'avance.
 Fait en Guinée. Conçu pour que les meilleurs gagnent.
 
 ### Fonctionnalités :
-- **Surveillance centralisée 24h/24** des sources officielles (JAO, DGCMP, TELEMO)
+- **Surveillance centralisée** des sources officielles (JAO, TELEMO, UNGM, UNDP)
 - **Analyse instantanée de documents** (50+ pages) via IA
 - **Indice de Crédibilité (0-100)** pour cibler les marchés gagnables
 - **Filtrage de précision** sur 20 secteurs spécialisés
-- **Rapport personnalisé chaque matin à 8h** directement en boîte mail
+- **Rapport personnalisé chaque lundi à 7h** directement en boîte mail
 
 ### Endpoints principaux :
 - `POST /enterprises` — Enregistrer une entreprise
+- `POST /individuals` — Inscrire un particulier
 - `GET /tenders` — Lister les appels d'offres
 - `GET /analysis/{enterprise_id}` — Analyses avec Indice de Crédibilité
     """,
@@ -122,6 +123,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(enterprises.router, prefix="/api/v1")
 app.include_router(tenders.router, prefix="/api/v1")
 app.include_router(analyses.router, prefix="/api/v1")
+app.include_router(individuals.router, prefix="/api/v1")
 
 
 # === Endpoints utilitaires ===

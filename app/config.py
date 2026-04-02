@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     SMTP_TLS: bool = True
 
     # --- Scraping ---
+    DGCMP_ENABLED: bool = False
     DGCMP_BASE_URL: str = "https://www.dgcmp.cd"
     TELEMO_BASE_URL: str = "https://telemo.gov.gn"
     JAO_BASE_URL: str = "https://www.jaoguinee.com"

@@ -34,4 +34,4 @@ RUN mkdir -p /app/downloads /app/logs
 # Note: Railway gère le port et le healthcheck automatiquement
 
 # Commande de démarrage (Railway fournit $PORT dynamiquement)
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1
+CMD ["sh", "-c", "python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]

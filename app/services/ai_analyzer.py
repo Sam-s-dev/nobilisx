@@ -250,8 +250,6 @@ JSON :"""
             logger.error(f"Erreur analyse tender #{tender.id}: {e}")
             return None
 
-
-
     def analyze_all_pending(self) -> list[Analysis]:
         """
         Analyse tous les tenders non encore analyses.
@@ -361,4 +359,54 @@ Donne exactement 2 recommandations courtes (max 2 phrases chacune). Pas d'introd
             return [
                 "Consultez regulierement les nouveaux appels d'offres pour ne pas manquer d'opportunites.",
                 "Preparez vos dossiers de candidature a l'avance pour reagir rapidement.",
+            ]
+
+    def generate_individual_recommendations(self, individual, top_scored: list[dict]) -> list[str]:
+        """
+        Génère exactement 2 recommandations courtes et directes pour un particulier.
+        Focus : amélioration du profil, conseil de postulation, matching.
+        """
+        try:
+            nb_opps = 3
+            opps = ""
+            for i, item in enumerate(top_scored[:nb_opps], 1):
+                opps += f"{i}. {item.get('mission_title', item.get('tender_title', 'Mission'))[:80]} (Match: {item.get('score', 0):.0f}/100)\n"
+
+            system_prompt = (
+                "Tu es un mentor pour freelances. Tu donnes des conseils directs, motivants et "
+                "courts en français. Pas d'émojis. Pas d'introduction, pas de conclusion."
+            )
+            
+            user_prompt = f"""Profil particulier :
+- Nom : {individual.full_name}
+- Domaine : {individual.domain}
+- Compétences : {individual.skills}
+- Expérience : {individual.experience_level} ({individual.experience_years} ans)
+
+Missions sélectionnées :
+{opps or 'Aucune.'}
+
+Donne exactement 2 conseils courts (max 2 phrases chacun) pour aider ce profil à décrocher ces missions ou améliorer son attractivité.
+Format : liste numérotée."""
+
+            response = self._call_groq(system_prompt, user_prompt, max_tokens=300)
+            
+            recommendations = []
+            for line in response.strip().split("\n"):
+                line = line.strip()
+                if line and line[0].isdigit():
+                    clean = line.lstrip("0123456789").lstrip(".").lstrip(")").strip()
+                    if clean:
+                        recommendations.append(clean)
+
+            return recommendations[:2] if recommendations else [
+                "Mettez en avant vos projets précédents dans votre portfolio pour rassurer les clients.",
+                "Adaptez chaque message de motivation aux besoins spécifiques de la mission."
+            ]
+
+        except Exception as e:
+            logger.error(f"Erreur recommandations particuliers: {e}")
+            return [
+                "Optimisez la liste de vos compétences pour un meilleur matching avec les missions.",
+                "Soyez parmi les premiers à postuler en consultant vos alertes dès lundi matin."
             ]

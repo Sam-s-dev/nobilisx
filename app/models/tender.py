@@ -21,6 +21,7 @@ class Tender(Base):
     sector = Column(String(255), nullable=True, index=True)
     estimated_budget = Column(Float, nullable=True)
     location = Column(String(255), nullable=True)
+    source_country = Column(String(10), nullable=True, default="GN")
     deadline = Column(DateTime, nullable=True)
     source_url = Column(String(1000), nullable=False, unique=True)
     pdf_path = Column(String(500), nullable=True, comment="Chemin local du PDF téléchargé")

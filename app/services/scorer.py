@@ -253,7 +253,8 @@ class ScorerService:
         Met à jour les analyses en base.
         """
         analyses = self.db.query(Analysis).join(Tender).filter(
-            Tender.is_analyzed == True  # noqa: E712
+            Tender.is_analyzed == True,  # noqa: E712
+            Tender.source_country != "freelance"
         ).all()
 
         results = []
