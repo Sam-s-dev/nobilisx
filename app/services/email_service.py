@@ -399,8 +399,8 @@ class EmailService:
                 # Bloquer les envois aux comptes en attente de paiement
                 plan = getattr(enterprise, 'subscription_plan', 'PASS') or 'PASS'
                 
-                if plan.upper().startswith("PENDING_"):
-                    logger.info(f"Paiement en attente pour {enterprise.name} ({plan}) — rapport ignore")
+                if plan.upper().startswith("PENDING_") or plan.upper().startswith("SUSPENDED_"):
+                    logger.info(f"Rapport ignori pour {enterprise.name} ({plan}) — en attente ou bloque")
                     results["skipped"] += 1
                     continue
                 

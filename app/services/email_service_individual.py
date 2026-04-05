@@ -442,9 +442,9 @@ class IndividualEmailService:
                 # ── Bloquer les comptes en attente de paiement ──
                 plan = (individual.subscription_plan or "PASS").upper()
 
-                if plan.startswith("PENDING_"):
+                if plan.startswith("PENDING_") or plan.startswith("SUSPENDED_"):
                     logger.info(
-                        f"⏸️ Paiement en attente pour {individual.full_name} ({plan}) — rapport ignoré"
+                        f"⏸️ Rapport ignoré pour {individual.full_name} ({plan}) — en attente ou bloqué"
                     )
                     results["skipped"] += 1
                     continue

@@ -28,48 +28,62 @@ def verify_admin(x_admin_password: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Accès non autorisé : Mot de passe admin incorrect.")
     return True
 
-@router.get("/pending")
-def list_pending_users(
+@router.get("/list")
+def list_all_users(
     db: Session = Depends(get_db),
     authorized: bool = Depends(verify_admin)
 ):
-    """Liste tous les utilisateurs en attente de validation (Entreprises et Particuliers)"""
+    """Liste TOUS les utilisateurs (Entreprises et Particuliers) avec leur statut"""
     
     # 1. Entreprises
-    pending_ents = db.query(Enterprise).filter(
-        Enterprise.subscription_plan.like("PENDING_%")
-    ).all()
+    ents = db.query(Enterprise).all()
     
     # 2. Particuliers
-    pending_inds = db.query(Individual).filter(
-        Individual.subscription_plan.like("PENDING_%")
-    ).all()
+    inds = db.query(Individual).all()
     
     # Formater pour le frontend
     results = []
     
-    for ent in pending_ents:
+    for ent in ents:
+        plan = ent.subscription_plan or "PASS"
+        if plan.startswith("PENDING_"):
+            status = "pending"
+        elif plan.startswith("SUSPENDED_"):
+            status = "suspended"
+        else:
+            status = "active"
+            
         results.append({
             "id": ent.id,
             "type": "enterprise",
             "name": ent.name,
             "email": ent.email,
-            "plan_requested": ent.subscription_plan.replace("PENDING_", ""),
-            "created_at": ent.created_at.isoformat()
+            "plan": plan.replace("PENDING_", "").replace("SUSPENDED_", ""),
+            "status": status,
+            "created_at": ent.created_at.isoformat() if ent.created_at else None
         })
         
-    for ind in pending_inds:
+    for ind in inds:
+        plan = ind.subscription_plan or "PASS"
+        if plan.startswith("PENDING_"):
+            status = "pending"
+        elif plan.startswith("SUSPENDED_"):
+            status = "suspended"
+        else:
+            status = "active"
+            
         results.append({
             "id": ind.id,
             "type": "individual",
             "name": ind.full_name,
             "email": ind.email,
-            "plan_requested": ind.subscription_plan.replace("PENDING_", ""),
-            "created_at": ind.created_at.isoformat()
+            "plan": plan.replace("PENDING_", "").replace("SUSPENDED_", ""),
+            "status": status,
+            "created_at": ind.created_at.isoformat() if ind.created_at else None
         })
         
     # Trier par date (plus récent en haut)
-    results.sort(key=lambda x: x["created_at"], reverse=True)
+    results.sort(key=lambda x: (x["created_at"] or ""), reverse=True)
     return results
 
 @router.post("/validate")
@@ -79,42 +93,69 @@ def validate_user_payment(
     db: Session = Depends(get_db),
     authorized: bool = Depends(verify_admin)
 ):
-    """Valide le paiement d'un utilisateur et envoie l'email de confirmation"""
+    """Valide ou Rétablit un compte utilisateur"""
     
     if user_type == "enterprise":
         user = db.query(Enterprise).filter(Enterprise.email == email).first()
         service = EmailService(db)
     else:
         user = db.query(Individual).filter(Individual.email == email).first()
+        from app.services.email_service_individual import IndividualEmailService
         service = IndividualEmailService(db)
         
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé.")
         
-    if not user.subscription_plan.startswith("PENDING_"):
-        return {"message": "L'utilisateur est déjà actif ou n'a pas de paiement en attente.", "plan": user.subscription_plan}
-        
-    # 1. Retirer le préfixe PENDING_
+    # Retirer les préfixes de blocage
     old_plan = user.subscription_plan
-    new_plan = old_plan.replace("PENDING_", "")
+    new_plan = old_plan.replace("PENDING_", "").replace("SUSPENDED_", "")
+    
+    if old_plan == new_plan and new_plan != "PASS":
+        return {"message": "L'utilisateur est déjà actif.", "plan": new_plan}
+        
     user.subscription_plan = new_plan
-    
     db.commit()
-    logger.info(f"✅ Paiement validé pour {email} ({user_type}). Plan: {new_plan}")
     
-    # 2. Envoyer l'email de confirmation (Réutilise welcome_email qui gère le contenu selon le plan)
+    logger.info(f"✅ Compte activé/rétabli pour {email} ({user_type}). Plan: {new_plan}")
+    
+    # Envoyer l'email de bienvenue/confirmation
+    email_sent = False
     try:
         service.send_welcome_email(user)
         email_sent = True
     except Exception as e:
-        logger.error(f"❌ Erreur envoi email confirmation à {email}: {e}")
-        email_sent = False
+        logger.error(f"❌ Erreur email confirmation à {email}: {e}")
         
     return {
         "status": "success",
-        "message": f"Utilisateur {email} validé avec succès sur le plan {new_plan}.",
+        "message": f"Utilisateur {email} prêt sur le plan {new_plan}.",
         "email_sent": email_sent
     }
+
+@router.post("/suspend")
+def suspend_user(
+    email: str,
+    user_type: str,
+    db: Session = Depends(get_db),
+    authorized: bool = Depends(verify_admin)
+):
+    """Suspend un compte utilisateur (bloque les rapports)"""
+    if user_type == "enterprise":
+        user = db.query(Enterprise).filter(Enterprise.email == email).first()
+    else:
+        user = db.query(Individual).filter(Individual.email == email).first()
+        
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé.")
+        
+    if user.subscription_plan.startswith("SUSPENDED_"):
+        return {"message": "Déjà suspendu."}
+        
+    user.subscription_plan = f"SUSPENDED_{user.subscription_plan.replace('PENDING_', '')}"
+    db.commit()
+    
+    logger.info(f"🚫 Compte suspendu pour {email} ({user_type})")
+    return {"status": "success", "message": f"Compte {email} suspendu."}
 
 @router.delete("/user")
 def delete_user(
