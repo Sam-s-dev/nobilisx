@@ -4,12 +4,12 @@ Solution automatisée de collecte, analyse et distribution d'appels d'offres en 
 
 ## 🚀 Fonctionnalités
 
-- **Scraping Automatisé** : Collecte quotidienne depuis JAO Guinée (11 sources sectorielles).
+- **Scraping Multi-Sources** : Collecte quotidienne depuis JAO Guinée, mais aussi **International** (UNGM, UNDP) et **Freelance** (Upwork, Freelancer.com).
+- **Segments Entreprise & Particulier** : Support complet pour les entreprises (appels d'offres) et les freelances (missions spécifiques).
 - **Analyse par IA (Groq)** : Synthèse automatique et extraction de données structurées (budget, lieu, deadline).
-- **Matching Intelligent** : Calcul de score de pertinence pour chaque entreprise inscrite.
-- **Rapports Quotidiens** : Envoi automatique par email des meilleures opportunités.
-- **Anti-Spam Optimisé** : Délivrabilité améliorée grâce aux headers MIME et au contenu texte brut.
-- **20 Secteurs d'Activité** : Couverture complète des domaines économiques.
+- **Matching Intelligent** : Calcul de score de pertinence personnalisé pour chaque profil (Entreprise ou Freelance).
+- **Rapports Automatisés** : Envoi hebdomadaire par email des meilleures opportunités scorées.
+- **20 Secteurs d'Activité** : Couverture complète des domaines économiques et techniques.
 
 ## 🛠️ Installation
 
