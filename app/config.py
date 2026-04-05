@@ -22,8 +22,9 @@ class Settings(BaseSettings):
     # --- Application ---
     APP_NAME: str = "NOBILIS X"
     APP_VERSION: str = "2.0.0"
-    CONTACT_EMAIL: str = "trillionnx@gmail.com"
+    CONTACT_EMAIL: str = "trillionn@gmail.com"
     CONTACT_PHONE: str = "+224 627 27 13 97"
+    ADMIN_PASSWORD: str = "nobilis_admin_2024"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
 
@@ -51,8 +52,6 @@ class Settings(BaseSettings):
     SMTP_TLS: bool = True
 
     # --- Scraping ---
-    DGCMP_ENABLED: bool = False
-    DGCMP_BASE_URL: str = "https://www.dgcmp.cd"
     TELEMO_BASE_URL: str = "https://telemo.gov.gn"
     JAO_BASE_URL: str = "https://www.jaoguinee.com"
     SCRAPE_SCHEDULE_HOUR: int = 7

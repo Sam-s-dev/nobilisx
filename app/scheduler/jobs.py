@@ -144,28 +144,28 @@ def init_scheduler():
     """Initialise le planning V2 Bi-segment"""
     scheduler.add_listener(scheduler_event_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
 
-    # 1. COLLECTE : Chaque Samedi à 22h30
+    # 1. COLLECTE : Chaque Samedi à l'heure définie (Défaut 7h)
     scheduler.add_job(
         func=job_weekly_scrape,
-        trigger=CronTrigger(day_of_week='sat', hour=22, minute=30),
+        trigger=CronTrigger(day_of_week='sat', hour=settings.SCRAPE_SCHEDULE_HOUR, minute=0),
         id="weekly_scrape",
         name="NOBILIS X — Collecte Hebdomadaire (Samedi)",
         replace_existing=True,
     )
 
-    # 2. ANALYSE & ENVOI : Chaque Lundi à 07h00
+    # 2. ANALYSE & ENVOI : Chaque Lundi à l'heure définie (Défaut 8h)
     scheduler.add_job(
         func=job_weekly_cycle,
-        trigger=CronTrigger(day_of_week='mon', hour=7, minute=0),
+        trigger=CronTrigger(day_of_week='mon', hour=settings.EMAIL_SCHEDULE_HOUR, minute=0),
         id="weekly_analysis_send",
         name="NOBILIS X — Cycle Complet (Lundi)",
         replace_existing=True,
     )
 
-    # 3. ALERTES ELITE : Toutes les 2h (8h-20h)
+    # 3. ALERTES ELITE : 2 fois par jour (Matin 8h45 & Soir 18h45)
     scheduler.add_job(
         func=job_elite_realtime_alert,
-        trigger=CronTrigger(hour="8-20/2", minute=45),
+        trigger=CronTrigger(hour="8,18", minute=45),
         id="elite_realtime",
         name="NOBILIS X — Alertes ELITE",
         replace_existing=True,

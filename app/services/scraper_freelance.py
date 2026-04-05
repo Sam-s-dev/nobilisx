@@ -131,7 +131,7 @@ class FreelanceScraperService:
     def _tender_exists(self, source_url: str) -> bool:
         return self.db.query(Tender).filter(Tender.source_url == source_url).first() is not None
 
-    def scrape_freelance_missions(self) -> list[Tender]:
+    def scrape_freelance_missions(self, force: bool = False) -> list[Tender]:
         """Point d'entrée pour la collecte Freelance"""
         logger.info("💼 Lancement collecte Freelance (Upwork + Freelancer)")
         

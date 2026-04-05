@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import init_db
-from app.routers import enterprises, tenders, analyses, individuals
+from app.routers import enterprises, tenders, analyses, individuals, auth, admin
 from app.scheduler.jobs import init_scheduler, shutdown_scheduler
 
 # Configuration du logging
@@ -124,6 +124,8 @@ app.include_router(enterprises.router, prefix="/api/v1")
 app.include_router(tenders.router, prefix="/api/v1")
 app.include_router(analyses.router, prefix="/api/v1")
 app.include_router(individuals.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")
 
 
 # === Endpoints utilitaires ===

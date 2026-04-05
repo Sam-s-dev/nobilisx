@@ -48,7 +48,19 @@ def create_individual(
 
     # Gestion du statut en attente pour les plans payants
     client_plan = (payload.get("subscription_plan") or "PASS").upper()
-    if client_plan in ["ENTRY", "ELITE"]:
+    
+    if client_plan == "PASS":
+        # Vérifier si l'email a déjà été utilisé pour un compte (Entreprise ou Particulier)
+        from app.models.enterprise import Enterprise
+        already_ind = db.query(Individual).filter(Individual.email == payload["email"]).first()
+        already_ent = db.query(Enterprise).filter(Enterprise.email == payload["email"]).first()
+        if already_ind or already_ent:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Cet email a déjà bénéficié d'un essai gratuit ou d'un compte existant."
+            )
+        payload["subscription_plan"] = "PASS"
+    elif client_plan in ["ENTRY", "ELITE"]:
         payload["subscription_plan"] = f"PENDING_{client_plan}"
     else:
         payload["subscription_plan"] = "PASS"

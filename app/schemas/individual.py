@@ -11,6 +11,7 @@ from typing import Optional
 class IndividualBase(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=255)
     email: EmailStr = Field(..., description="Email pour recevoir les rapports")
+    whatsapp: Optional[str] = Field(None, max_length=50)
     country: str = Field(..., max_length=100)
     domain: str = Field(..., description="Domaine principal (ex: Développement web)")
     skills: str = Field(..., description="Compétences (mots-clés séparés par virgules)")

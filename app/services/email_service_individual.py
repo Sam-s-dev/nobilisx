@@ -124,7 +124,11 @@ class IndividualEmailService:
         mission_rows = ""
         text_lines = []
 
-        for item in scored_missions[:10]:
+        # Détermination du nombre de missions selon le plan
+        plan = (individual.subscription_plan or "PASS").upper()
+        max_missions = 10 if plan == "ELITE" else 5
+        
+        for item in scored_missions[:max_missions]:
             score = item["score"]
             score_color = "#22c55e" if score >= 70 else "#f59e0b" if score >= 40 else "#ef4444"
             source_url = item.get("source_url", "")
@@ -321,22 +325,22 @@ class IndividualEmailService:
         clean_domain = self._clean_text(individual.domain)
 
         if is_pending:
-            amount = "À définir"  # Tarifs particuliers à définir (Section 8)
+            amount = "1 500 000" if plan_base == "ELITE" else "1 000 000"
             message_body = f"""
     <p style="color:#e2e8f0;line-height:1.7;font-size:14px;">Ta pre-inscription pour le plan <strong style="color:#a78bfa;">NOBILIS {plan_base}</strong> est enregistree.</p>
     <div style="background:rgba(124,58,237,0.1);border:1px solid #7c3aed;padding:18px;border-radius:12px;margin:20px 0;">
         <h3 style="color:#a78bfa;margin-top:0;font-size:16px;">Action requise : Paiement Orange Money</h3>
-        <p style="color:#fff;line-height:1.6;margin-bottom:0;font-size:14px;">Pour activer ton abonnement et recevoir tes missions chaque lundi, fais un depot au :</p>
+        <p style="color:#fff;line-height:1.6;margin-bottom:0;font-size:14px;">Pour activer ton abonnement et recevoir tes missions chaque lundi, fais un depot de <strong>{amount} GNF</strong> au :</p>
         <p style="color:#a78bfa;font-size:22px;font-weight:bold;text-align:center;margin:12px 0;">+224 627 27 13 97</p>
-        <p style="color:#94a3b8;font-size:12px;margin:0;text-align:center;">Envoie la capture du paiement sur WhatsApp a ce numero.</p>
+        <p style="color:#94a3b8;font-size:12px;margin:0;text-align:center;">Precise "NOBILIS" ou envoie la capture du paiement sur WhatsApp a ce numero.</p>
     </div>
             """
         else:
             message_body = f"""
-    <p style="color:#e2e8f0;line-height:1.7;font-size:14px;">C'est bon, tu es inscrit ! Chaque <strong style="color:#a78bfa;">lundi a 7h</strong>, tu recevras tes meilleures missions en <strong style="color:#fff;">{clean_domain}</strong>.</p>
-    <p style="color:#e2e8f0;line-height:1.7;font-size:14px;">NOBILIS X analyse <strong style="color:#fff;">Upwork</strong> et <strong style="color:#fff;">Freelancer.com</strong> pour toi et calcule un <strong style="color:#a78bfa;">Score de Compatibilite</strong> personnalise.</p>
+    <p style="color:#e2e8f0;line-height:1.7;font-size:14px;"><strong>C'est bon, ton paiement a été validé ! Ton compte NOBILIS {plan_base} est maintenant 100% actif.</strong></p>
+    <p style="color:#e2e8f0;line-height:1.7;font-size:14px;">Chaque <strong>lundi à 7h</strong>, tu recevras par mail tes meilleures missions de freelance en <strong style="color:#fff;">{clean_domain}</strong> avec un score de compatibilité personnalisé.</p>
     <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);padding:14px 18px;border-radius:10px;margin:16px 0;">
-        <p style="color:#c4b5fd;font-size:13px;margin:0;line-height:1.5;">💡 <strong>Astuce :</strong> Plus tes competences sont detaillees, meilleur sera le matching. N'hesite pas a mettre a jour ton profil !</p>
+        <p style="color:#c4b5fd;font-size:13px;margin:0;line-height:1.5;">💡 <strong>Astuce :</strong> Surveille bien ta boîte mail lundi matin à 7h00 précise !</p>
     </div>
             """
 

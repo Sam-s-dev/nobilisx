@@ -30,7 +30,7 @@ SUBSCRIPTION_PLANS = {
         "name": "NOBILIS ENTRY",
         "description": "Idéal pour démarrer et tester le système.",
         "max_sectors": 5,
-        "price_gnf": 1_500_000,
+        "price_gnf": 2_000_000, # Par défaut pour Entreprise, sera ajusté par segment
         "duration_days": 30,
         "features": [
             "Veille sur 5 secteurs clés de votre choix",
@@ -43,7 +43,7 @@ SUBSCRIPTION_PLANS = {
         "name": "NOBILIS ELITE ★",
         "description": "Système Expert complet — Analyse approfondie de documents.",
         "max_sectors": 20,
-        "price_gnf": 3_500_000,
+        "price_gnf": 3_000_000, # Par défaut pour Entreprise, sera ajusté par segment
         "duration_days": 30,
         "features": [
             "Système Expert complet — Analyse approfondie de documents",

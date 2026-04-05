@@ -6,7 +6,7 @@
     <title>NOBILIS X — Système Expert de Veille & Analyse des Appels d'Offres</title>
     <meta name="description" content="NOBILIS X : L'intelligence des marchés publics en Guinée. Surveillance centralisée, analyse IA, Indice de Crédibilité — Ne manquez plus jamais un contrat.">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <style>
         :root {
@@ -101,7 +101,7 @@
             box-shadow: 0 4px 16px rgba(124,58,237,0.3);
         }
 
-        .brand-icon svg { color: #fff; }
+        .brand-icon i { color: #fff; }
 
         .brand-text-wrap { display: flex; flex-direction: column; }
 
@@ -794,8 +794,49 @@
             border-radius: 100px !important;
         }
 
-        /* ===== CTA BANNER ===== */
-        .cta-banner { padding: 80px 24px; }
+        /* ===== MODAL ===== */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(30,27,75,0.6);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            z-index: 2000; display: none; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active { display: flex; opacity: 1; }
+        .modal-content {
+            background: #fff; width: 90%; max-width: 500px;
+            padding: 40px; border-radius: 28px; position: relative;
+            box-shadow: var(--shadow-lg); transform: translateY(20px);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.active .modal-content { transform: translateY(0); }
+        .modal-close {
+            position: absolute; top: 20px; right: 20px;
+            background: var(--bg); border: none; width: 32px; height: 32px;
+            border-radius: 50%; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; color: var(--text-muted);
+        }
+        .modal-header { text-align: center; margin-bottom: 24px; }
+        .modal-title { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); }
+        .modal-body { text-align: center; }
+        .payment-status {
+            padding: 20px; border-radius: 16px; background: var(--violet-xsoft);
+            margin-bottom: 24px; border: 1.5px dashed var(--violet-mid);
+        }
+        .payment-amount { font-size: 1.8rem; font-weight: 900; color: var(--violet-mid); margin: 10px 0; }
+        .payment-instructions { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; }
+        .payment-btn {
+            width: 100%; padding: 16px; background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff; border: none; border-radius: 14px; font-weight: 800; cursor: pointer;
+            box-shadow: 0 4px 16px rgba(217,119,6,0.25); transition: var(--transition);
+        }
+        .payment-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(217,119,6,0.35); }
+
+        .trial-warning {
+            background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+            padding: 12px 16px; border-radius: 12px; font-size: 0.85rem;
+            margin-bottom: 16px; display: none; align-items: flex-start; gap: 10px;
+        }
+        .trial-warning i { margin-top: 3px; }
 
         .cta-inner {
             background: linear-gradient(135deg, var(--violet-xsoft), #fff);
@@ -888,6 +929,16 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        /* Sécurité : après l'animation, les éléments restent visibles */
+        .hero-badge, .hero h1, .hero-tagline, .hero-btns,
+        .segment-selector, .hero-visual {
+            animation-fill-mode: both;
+        }
+        /* Si JS est bloqué, on force la visibilité après 2s */
+        @media (prefers-reduced-motion: no-preference) {
+            .hero-badge { animation-delay: 0s; }
+        }
+
         .fade-in {
             opacity: 0; transform: translateY(24px);
             transition: opacity 0.6s ease, transform 0.6s ease;
@@ -905,6 +956,70 @@
             .register-wrapper { padding: 32px 20px; }
             .hero { padding-top: 100px; }
             .float-chip { display: none; }
+        }
+
+        /* Choices.js Custom Styling */
+        #sector { display: none; } /* Masquer le select brut par défaut */
+        
+        .choices__inner {
+            background: var(--bg) !important;
+            border: 1.5px solid var(--border) !important;
+            border-radius: 12px !important;
+            padding: 8px 12px !important;
+            min-height: 48px !important;
+            box-shadow: none !important;
+            transition: var(--transition);
+        }
+        .choices.is-focused .choices__inner {
+            border-color: var(--violet-mid) !important;
+            background: #fff !important;
+            box-shadow: 0 0 0 4px rgba(124,58,237,0.08) !important;
+        }
+        .choices__list--multiple .choices__item {
+            background-color: var(--violet-soft) !important;
+            color: var(--violet-mid) !important;
+            border: none !important;
+            border-radius: 100px !important;
+            padding: 4px 14px !important;
+            font-weight: 700 !important;
+            font-size: 0.8rem !important;
+            margin: 2px 8px 2px 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+        }
+        .choices__button {
+            border: none !important;
+            margin-left: 8px !important;
+            padding: 0 !important;
+            font-size: 0 !important;
+            position: relative !important;
+            width: 14px !important;
+            height: 14px !important;
+            background-image: none !important;
+            opacity: 0.6 !important;
+        }
+        .choices__button::after {
+            content: "\f00d";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            font-size: 10px;
+            color: var(--violet-mid);
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .choices__button:hover { opacity: 1 !important; }
+        .choices__list--dropdown {
+            border-radius: 14px !important;
+            border: 1px solid var(--border) !important;
+            box-shadow: var(--shadow-lg) !important;
+            margin-top: 8px !important;
+            overflow: hidden !important;
+            z-index: 100 !important;
+        }
+        .choices__item--selectable.is-highlighted {
+            background-color: var(--violet-xsoft) !important;
+            color: var(--violet-mid) !important;
         }
     </style>
 </head>
@@ -1288,8 +1403,8 @@
                 <div class="price-card fade-in">
                     <div class="price-tier">Annuel</div>
                     <div class="price-name" id="titleEntry">NOBILIS ENTRY</div>
-                    <div class="price-amount" id="priceEntry">1 500 000 GNF</div>
-                    <div class="price-period">par an</div>
+                    <div class="price-amount" id="priceEntry">2 000 000 GNF</div>
+                    <div class="price-period" id="periodEntry">par an</div>
                     <div class="price-divider"></div>
                     <ul class="price-features" id="listEntry">
                         <li>
@@ -1316,8 +1431,8 @@
                     <span class="featured-badge">★ RECOMMANDÉ</span>
                     <div class="price-tier">Premium</div>
                     <div class="price-name" id="titleElite">NOBILIS ELITE</div>
-                    <div class="price-amount" id="priceElite">3 500 000 GNF</div>
-                    <div class="price-period">par an</div>
+                    <div class="price-amount" id="priceElite">3 000 000 GNF</div>
+                    <div class="price-period" id="periodElite">par an</div>
                     <div class="price-divider"></div>
                     <ul class="price-features" id="listElite">
                         <li>
@@ -1400,11 +1515,11 @@
                     </div>
                     <div class="plan-option" data-plan="ENTRY" onclick="selectPlan('ENTRY')">
                         <div class="plan-opt-name">ENTRY</div>
-                        <div class="plan-opt-price">1.5M GNF / an</div>
+                        <div id="planPriceEntry" class="plan-opt-price">2M GNF / an</div>
                     </div>
                     <div class="plan-option" data-plan="ELITE" onclick="selectPlan('ELITE')">
                         <div class="plan-opt-name">ELITE ★</div>
-                        <div class="plan-opt-price">3.5M GNF / an</div>
+                        <div id="planPriceElite" class="plan-opt-price">3M GNF / an</div>
                     </div>
                 </div>
 
@@ -1476,28 +1591,13 @@
                     <div class="form-group">
                         <label for="sector" id="labelDomain">Secteurs d'Activité</label>
                         <select id="sector" name="sector" multiple required>
-                            <option value="">Sélectionnez vos secteurs</option>
-                            <option value="Agriculture, Peche & Developpement Rural">Agriculture, Pêche & Développement Rural</option>
-                            <option value="Agroalimentaire & Transformation">Agroalimentaire & Transformation</option>
-                            <option value="Communication, Medias & Publicite">Communication, Médias & Publicité</option>
-                            <option value="Education & Formation">Éducation & Formation</option>
-                            <option value="Energie, Eau & Environnement">Énergie, Eau & Environnement</option>
-                            <option value="Environnement, Forets & Changement Climatique">Environnement, Forêts & Changement Climatique</option>
-                            <option value="Etudes & Consultances">Études & Consultances</option>
-                            <option value="Fournitures & Equipements">Fournitures & Équipements</option>
-                            <option value="Gouvernance & Administration Publique">Gouvernance & Administration Publique</option>
-                            <option value="Immobilier & Amenagement Urbain">Immobilier & Aménagement Urbain</option>
-                            <option value="Industrie & Commerce">Industrie & Commerce</option>
-                            <option value="Informatique & Telecommunications">Informatique & Télécommunications</option>
-                            <option value="Mines & Ressources Naturelles">Mines & Ressources Naturelles</option>
-                            <option value="QSE - Qualite, Securite & Environnement">QSE - Qualité, Sécurité & Environnement</option>
-                            <option value="Sante & Paramedical">Santé & Paramédical</option>
-                            <option value="Securite & Protection">Sécurité & Protection</option>
-                            <option value="Services Generaux & Prestations diverses">Services Généraux & Prestations diverses</option>
-                            <option value="Tourisme, Culture & Loisirs">Tourisme, Culture & Loisirs</option>
-                            <option value="Transport & Logistique">Transport & Logistique</option>
-                            <option value="Travaux Publics & Construction">Travaux Publics & Construction</option>
+                            <!-- Les options sont injectées dynamiquement par le script JS selon le segment -->
                         </select>
+                    </div>
+
+                    <div id="trialWarning" class="trial-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Cet email a déjà bénéficié d'un essai gratuit. Veuillez choisir le plan <strong>ENTRY</strong> ou <strong>ELITE</strong> pour continuer.</span>
                     </div>
 
                     <div class="form-group">
@@ -1538,7 +1638,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="technical_capacity">Capacités Techniques & Références</label>
+                        <label for="technical_capacity" id="labelBio">Capacités Techniques & Références</label>
                         <textarea id="technical_capacity" name="technical_capacity"
                             placeholder="Décrivez brièvement vos équipements, certifications ou projets récents..." rows="4"></textarea>
                     </div>
@@ -1575,18 +1675,18 @@
         <div class="footer-brand">NOBILIS X</div>
         <p class="footer-tagline">L'intelligence de l'information pour les bâtisseurs de demain.</p>
         <div class="footer-contact">
-            <a href="mailto:contact@nobilisX.com">📧 contact@nobilisX.com</a>
-            <a href="tel:+224627271397">📞 +224 627 27 13 97</a>
+            <a href="mailto:trillionn@gmail.com"><i class="fas fa-envelope"></i> trillionn@gmail.com</a>
+            <a href="tel:+224627271397"><i class="fas fa-phone"></i> +224 627 27 13 97</a>
         </div>
         <div class="footer-payment">
-            <p><strong>💸 Paiement Orange Money</strong></p>
-            <p>+224 627 27 13 97</p>
+            <p><strong><i class="fas fa-money-bill-wave"></i> Paiement Orange Money</strong></p>
+            <p style="font-weight: 700; color: var(--violet-light);">+224 627 27 13 97</p>
         </div>
-        <p style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-bottom: 14px;">📍 Conakry, Guinée</p>
+        <p style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-bottom: 14px;"><i class="fas fa-map-marker-alt"></i> Conakry, Guinée</p>
         <div class="footer-badges">
-            <span class="footer-badge">✓ Activation sous 24h</span>
-            <span class="footer-badge">✓ 2 jours d'essai gratuit</span>
-            <span class="footer-badge">✓ Résultats dès le 1er jour</span>
+            <span class="footer-badge"><i class="fas fa-check-circle"></i> Activation sous 24h</span>
+            <span class="footer-badge"><i class="fas fa-check-circle"></i> 2 jours d'essai gratuit</span>
+            <span class="footer-badge"><i class="fas fa-check-circle"></i> Résultats dès le 1er jour</span>
         </div>
         <p class="footer-made">
             Fait en Guinée. Conçu pour que les meilleurs gagnent.<br>
@@ -1594,178 +1694,223 @@
         </p>
     </footer>
 
-    <script>
-        // ===== THEME & SEGMENT LOGIC =====
-        let currentSegment = 'enterprise';
+    <!-- PAYMENT MODAL -->
+    <div id="paymentModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+            <div class="modal-header">
+                <div class="modal-title">Paiement Orange Money</div>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 8px;">Presque terminé ! Activez votre accès premium.</p>
+            </div>
+            <div class="modal-body">
+                <div class="payment-status">
+                    <p style="font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px;">Montant à régler</p>
+                    <div id="modalPrice" class="payment-amount">0 GNF</div>
+                    <p style="font-size: 0.8rem; color: var(--violet-mid); font-weight: 600;">Plan : <span id="modalPlanName">...</span></p>
+                </div>
+                
+                <div class="payment-instructions">
+                    <p style="margin-bottom: 12px;"><i class="fas fa-info-circle"></i> Veuillez effectuer le transfert au numéro suivant :</p>
+                    <div style="background: var(--bg); padding: 12px; border-radius: 12px; font-size: 1.2rem; font-weight: 800; color: var(--text-primary); margin-bottom: 16px;">
+                        +224 627 27 13 97
+                    </div>
+                    <p style="font-size: 0.8rem; margin-bottom: 20px;">Une fois le transfert effectué, cliquez sur le bouton ci-dessous pour finaliser votre inscription. Notre équipe validera votre accès sous 24h.</p>
+                </div>
 
-        function setSegment(seg) {
+                <button id="confirmPaymentBtn" class="payment-btn">
+                    <i class="fas fa-check-circle"></i> J'AI EFFECTUÉ LE PAIEMENT
+                </button>
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 14px;">Besoin d'aide ? Contactez-nous sur WhatsApp.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // -- GLOBALS --
+        let currentSegment = 'enterprise';
+        let isTrialAvailable = true;
+        let sectorChoices;
+
+        const SECTORS_LIST = [
+            { value: 'Agriculture, Peche & Developpement Rural', label: 'Agriculture, Pêche & Développement Rural' },
+            { value: 'Agroalimentaire & Transformation', label: 'Agroalimentaire & Transformation' },
+            { value: 'Communication, Medias & Publicite', label: 'Communication, Médias & Publicité' },
+            { value: 'Education & Formation', label: 'Éducation & Formation' },
+            { value: 'Energie, Eau & Environnement', label: 'Énergie, Eau & Environnement' },
+            { value: 'Environnement, Forets & Changement Climatique', label: 'Environnement, Forêts & Changement Climatique' },
+            { value: 'Etudes & Consultances', label: 'Études & Consultances' },
+            { value: 'Fournitures & Equipements', label: 'Fournitures & Équipements' },
+            { value: 'Gouvernance & Administration Publique', label: 'Gouvernance & Administration Publique' },
+            { value: 'Immobilier & Amenagement Urbain', label: 'Immobilier & Aménagement Urbain' },
+            { value: 'Industrie & Commerce', label: 'Industrie & Commerce' },
+            { value: 'Informatique & Telecommunications', label: 'Informatique & Télécommunications' },
+            { value: 'Mines & Ressources Naturelles', label: 'Mines & Ressources Naturelles' },
+            { value: 'QSE - Qualite, Securite & Environnement', label: 'QSE - Qualité, Sécurité & Environnement' },
+            { value: 'Sante & Paramedical', label: 'Santé & Paramédical' },
+            { value: 'Securite & Protection', label: 'Sécurité & Protection' },
+            { value: 'Services Generaux & Prestations diverses', label: 'Services Généraux & Prestations diverses' },
+            { value: 'Tourisme, Culture & Loisirs', label: 'Tourisme, Culture & Loisirs' },
+            { value: 'Transport & Logistique', label: 'Transport & Logistique' },
+            { value: 'Travaux Publics & Construction', label: 'Travaux Publics & Construction' }
+        ];
+
+        const DOMAINS_LIST = [
+            { value: 'Web', label: 'Développement Web' },
+            { value: 'Design', label: 'Design & UI/UX' },
+            { value: 'Marketing', label: 'Marketing Digital' },
+            { value: 'Data', label: 'Data Science & IA' },
+            { value: 'Writing', label: 'Rédaction & Traduction' },
+            { value: 'Strategy', label: 'Conseil & Stratégie' },
+            { value: 'Video', label: 'Vidéo & Animation' }
+        ];
+
+        // -- UTILITIES --
+        window.closeModal = function() {
+            document.getElementById('paymentModal').classList.remove('active');
+        };
+
+        window.selectPlan = function(plan) {
+            document.querySelectorAll('.plan-option').forEach(p => p.classList.remove('active'));
+            document.querySelector(`.plan-option[data-plan="${plan}"]`)?.classList.add('active');
+            document.getElementById('subscription_plan').value = plan;
+            
+            // Adjust sector limit based on plan
+            const limits = { 'PASS': 3, 'ENTRY': 5, 'ELITE': 20 };
+            if (sectorChoices) {
+                // Choices.js doesn't update config dynamically well, but we can check on submit
+            }
+            
+            // If email checked and trial not available, warn
+            if(plan === 'PASS' && !isTrialAvailable) {
+                alert("Cet email a déjà utilisé son essai gratuit. Veuillez choisir ENTRY ou ELITE.");
+                selectPlan('ENTRY');
+            }
+        };
+
+        window.setSegment = function(seg) {
             currentSegment = seg;
             const isFreelance = seg === 'freelance';
 
-            // Theme
+            // Theme & Active State
             document.body.classList.toggle('theme-freelance', isFreelance);
-
-            // Cards
             document.getElementById('cardEnterprise').classList.toggle('active', !isFreelance);
             document.getElementById('cardFreelance').classList.toggle('active', isFreelance);
 
-            // Hero text
-            document.getElementById('heroTitle').innerHTML = isFreelance
-                ? 'Décrochez des<br><span>missions premium</span><br>à l\'international'
+            // Text content
+            document.getElementById('heroTitle').innerHTML = isFreelance 
+                ? 'Décrochez des<br><span>missions premium</span><br>à l\'international' 
                 : 'L\'intelligence<br><span>des marchés publics</span><br>à votre portée';
-
-            document.getElementById('heroDesc').textContent = isFreelance
+            
+            document.getElementById('heroDesc').textContent = isFreelance 
                 ? 'Nobilis X surveille Upwork, Freelancer et les plateformes mondiales pour vous livrer les meilleures missions chaque semaine — avant tout le monde.'
                 : 'Nobilis X surveille, analyse et vous alerte sur les meilleures opportunités d\'affaires — pour que vous puissiez gagner plus de contrats, sans effort.';
 
-            document.getElementById('heroBtn').textContent = isFreelance
-                ? 'Activer ma croissance Freelance →'
-                : 'Activer ma croissance Entreprise →';
+            document.getElementById('heroBtn').innerHTML = isFreelance 
+                ? 'Activer ma croissance Freelance <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>'
+                : 'Activer ma croissance Entreprise <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>';
 
-            // Form fields
+            // Form Visibility & Labels
             document.getElementById('labelName').textContent = isFreelance ? 'Votre Nom Complet' : 'Nom de l\'Entreprise';
             document.getElementById('name').placeholder = isFreelance ? 'Ex: Mamadou Diallo' : 'Ex: Guinean Tech Solutions';
             document.getElementById('labelDomain').textContent = isFreelance ? 'Domaine(s) d\'expertise' : 'Secteurs d\'Activité';
+            document.getElementById('labelBio').textContent = isFreelance ? 'Bio & Références Freelance' : 'Capacités Techniques & Références';
+            document.getElementById('technical_capacity').placeholder = isFreelance 
+                ? 'Résumez vos projets marquants et outils maîtrisés...'
+                : 'Décrivez brièvement vos équipements, certifications ou projets récents...';
 
             document.getElementById('groupFreelanceOnly').style.display = isFreelance ? 'block' : 'none';
             document.getElementById('groupEnterpriseOnly').style.display = isFreelance ? 'none' : 'block';
             document.getElementById('groupEnterpriseSpecificsOnly').style.display = isFreelance ? 'none' : 'block';
 
-            // Pricing
-            if (isFreelance) {
-                document.getElementById('titleEntry').textContent = 'NOBILIS FREELANCE';
-                document.getElementById('priceEntry').textContent = '500 000 GNF';
-                document.getElementById('listEntry').innerHTML = `
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Veille sur Upwork & Freelancer</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Alertes hebdomadaires par email</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Score de compatibilité missions</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Idéal pour débuter à l'international</li>`;
-                document.getElementById('titleElite').textContent = 'NOBILIS FREELANCE PRO';
-                document.getElementById('priceElite').textContent = '1 000 000 GNF';
-                document.getElementById('listElite').innerHTML = `
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Toutes plateformes couvertes</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Coaching stratégique dédié</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Score de compatibilité (0-100)</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Rapport top 10 missions / semaine</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Livraison prioritaire à 07h00</li>`;
-            } else {
-                document.getElementById('titleEntry').textContent = 'NOBILIS ENTRY';
-                document.getElementById('priceEntry').textContent = '1 500 000 GNF';
-                document.getElementById('listEntry').innerHTML = `
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Veille sur 5 secteurs (Guinée)</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Alertes quotidiennes par email</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Support technique réactif</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Idéal pour une veille annuelle</li>`;
-                document.getElementById('titleElite').textContent = 'NOBILIS ELITE';
-                document.getElementById('priceElite').textContent = '3 500 000 GNF';
-                document.getElementById('listElite').innerHTML = `
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Audit complet multi-sources</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Conseils stratégiques concrets</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Score de compatibilité (0-100)</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Couverture totale des secteurs</li>
-                    <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Rapport premium à 07h00 pile</li>`;
+            // Choices Update (Force clear static options first)
+            if (sectorChoices) {
+                const selectElement = document.getElementById('sector');
+                selectElement.innerHTML = ''; 
+                sectorChoices.clearChoices();
+                sectorChoices.setChoices(isFreelance ? DOMAINS_LIST : SECTORS_LIST, 'value', 'label', true);
             }
-        }
 
-        // ===== CHOICES JS =====
-        const sectorChoices = new Choices('#sector', {
-            removeItemButton: true,
-            maxItemCount: 3,
-            searchEnabled: true,
-            placeholderValue: 'Cliquer pour choisir...',
-            itemSelectText: '',
-            noResultsText: 'Aucun résultat trouvé',
-            noChoicesText: 'Tous les choix ont été ajoutés',
-        });
-        window.sectorChoices = sectorChoices;
+            // Pricing Update (Correction Finale)
+            const entryVal = isFreelance ? '1 000 000 GNF' : '2 000 000 GNF';
+            const eliteVal = isFreelance ? '1 500 000 GNF' : '3 000 000 GNF';
+            const entryShort = isFreelance ? '1M GNF / an' : '2M GNF / an';
+            const eliteShort = isFreelance ? '1.5M GNF / an' : '3M GNF / an';
+            
+            document.getElementById('priceEntry').textContent = entryVal;
+            document.getElementById('priceElite').textContent = eliteVal;
+            
+            // Plan Selector prices in form
+            const pEntry = document.getElementById('planPriceEntry');
+            const pElite = document.getElementById('planPriceElite');
+            if (pEntry) pEntry.textContent = entryShort;
+            if (pElite) pElite.textContent = eliteShort;
+            
+            document.getElementById('titleEntry').textContent = isFreelance ? 'FREELANCE ENTRY' : 'NOBILIS ENTRY';
+            document.getElementById('titleElite').textContent = isFreelance ? 'FREELANCE ELITE' : 'NOBILIS ELITE';
+        };
 
-        // ===== PLAN SELECTOR =====
-        function selectPlan(plan) {
-            document.querySelectorAll('.plan-option').forEach(p => p.classList.remove('active'));
-            document.querySelector(`.plan-option[data-plan="${plan}"]`)?.classList.add('active');
-            document.getElementById('subscription_plan').value = plan;
-            const limits = { 'PASS': 3, 'ENTRY': 5, 'ELITE': 20 };
-            sectorChoices.config.maxItemCount = limits[plan];
-        }
+        // -- TRIAL CHECK --
+        async function checkTrialEligibility() {
+            const email = document.getElementById('email').value.trim();
+            if (!email || !email.includes('@')) return;
 
-        document.querySelectorAll('.price-btn[data-plan]').forEach(btn => {
-            btn.addEventListener('click', () => selectPlan(btn.dataset.plan));
-        });
-
-        // ===== LOGO UPLOAD =====
-        const logoInput = document.getElementById('logo');
-        const logoPreview = document.getElementById('logoPreview');
-        const logoFilename = document.getElementById('logoFilename');
-        const logoDropArea = document.getElementById('logoDropArea');
-
-        logoInput?.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                if (file.size > 2 * 1024 * 1024) {
-                    alert('Le logo ne doit pas dépasser 2 Mo.');
-                    logoInput.value = '';
-                    return;
+            try {
+                const res = await fetch(`/api/v1/auth/check-trial/${encodeURIComponent(email)}`);
+                const data = await res.json();
+                isTrialAvailable = data.available;
+                
+                const trialWarning = document.getElementById('trialWarning');
+                if (!isTrialAvailable) {
+                    trialWarning.style.display = 'flex';
+                    if (document.getElementById('subscription_plan').value === 'PASS') {
+                        selectPlan('ENTRY');
+                    }
+                } else {
+                    trialWarning.style.display = 'none';
                 }
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    logoPreview.src = ev.target.result;
-                    logoPreview.style.display = 'block';
-                    logoFilename.textContent = file.name;
-                    logoFilename.style.display = 'block';
-                    logoDropArea.classList.add('has-file');
-                };
-                reader.readAsDataURL(file);
+            } catch (e) {
+                console.error("Erreur check trial:", e);
             }
-        });
+        }
 
-        // ===== FORM SUBMISSION =====
-        const form = document.getElementById('registerForm');
-        const msgDiv = document.getElementById('message');
-        const btnText = document.getElementById('btnText');
-        const loader = document.getElementById('loader');
-        const submitBtn = document.getElementById('submitBtn');
+        // -- FINAL SUBMIT --
+        async function performFinalSubmit() {
+            const submitBtn = document.getElementById('submitBtn');
+            const btnText = document.getElementById('btnText');
+            const loader = document.getElementById('loader');
+            const msgDiv = document.getElementById('message');
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
             submitBtn.disabled = true;
             btnText.style.display = 'none';
             loader.style.display = 'block';
             msgDiv.style.display = 'none';
 
-            const selectedSectors = sectorChoices.getValue(true);
-            if (selectedSectors.length === 0) {
-                msgDiv.innerHTML = "Veuillez sélectionner au moins un domaine/secteur.";
-                msgDiv.className = 'msg-error';
-                msgDiv.style.display = 'block';
-                submitBtn.disabled = false;
-                btnText.style.display = 'block';
-                loader.style.display = 'none';
-                return;
-            }
-
             const isFreelance = currentSegment === 'freelance';
             const endpoint = isFreelance ? '/api/v1/individuals' : '/api/v1/enterprises';
+            
+            const selectedSectors = sectorChoices.getValue(true);
+            const plan = document.getElementById('subscription_plan').value;
 
-            let formData;
+            let payload = {};
             if (isFreelance) {
-                formData = {
+                payload = {
                     full_name: document.getElementById('name').value,
                     email: document.getElementById('email').value,
                     whatsapp: document.getElementById('whatsapp')?.value || "",
                     domain: selectedSectors.join(', '),
                     skills: document.getElementById('specific_keywords').value,
-                    experience_level: document.getElementById('experience_level')?.value || "Intermédiaire",
+                    experience_level: document.getElementById('experience_level').value,
                     experience_years: parseInt(document.getElementById('experience_years').value) || 0,
-                    technical_capacity: document.getElementById('technical_capacity').value,
+                    bio: document.getElementById('technical_capacity').value, 
                     portfolio_url: document.getElementById('portfolio_url').value || "",
-                    mission_type: document.getElementById('mission_type').value || "Les deux",
+                    mission_type: document.getElementById('mission_type').value,
                     desired_rate: parseFloat(document.getElementById('desired_rate').value) || 0,
-                    languages: document.getElementById('languages').value || "FR+EN",
-                    subscription_plan: document.getElementById('subscription_plan').value,
+                    languages: document.getElementById('languages').value,
+                    subscription_plan: plan,
                     country: "Guinée"
                 };
             } else {
-                formData = {
+                payload = {
                     name: document.getElementById('name').value,
                     sector: selectedSectors.join(', '),
                     email: document.getElementById('email').value,
@@ -1776,54 +1921,31 @@
                     max_budget: parseFloat(document.getElementById('max_budget').value) || 0,
                     experience_years: parseInt(document.getElementById('experience_years').value) || 0,
                     technical_capacity: document.getElementById('technical_capacity').value,
-                    subscription_plan: document.getElementById('subscription_plan').value,
+                    subscription_plan: plan
                 };
             }
 
             try {
-                const response = await fetch(endpoint, {
+                const res = await fetch(endpoint, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData),
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
                 });
-                const data = await response.json();
+                const data = await res.json();
 
-                if (response.ok) {
-                    const id = data.id;
-                    if (!isFreelance && logoInput.files[0] && id) {
-                        try {
-                            const logoFormData = new FormData();
-                            logoFormData.append('file', logoInput.files[0]);
-                            await fetch(`/api/v1/enterprises/${id}/logo`, { method: 'POST', body: logoFormData });
-                        } catch (logoErr) { console.warn('Erreur logo:', logoErr); }
-                    }
-
-                    const subPlan = formData.subscription_plan;
-                    if (subPlan === 'PASS') {
-                        msgDiv.innerHTML = `✅ Bienvenue dans le cercle NOBILIS X !<br>Accès activé. Vos 2 jours d'essai gratuits commencent maintenant.<br>Premier rapport complet Lundi à 07h00.`;
-                        msgDiv.className = 'msg-success';
-                    } else {
-                        let amount = isFreelance
-                            ? (subPlan === 'ELITE' ? '1 000 000 GNF' : '500 000 GNF')
-                            : (subPlan === 'ELITE' ? '3 500 000 GNF' : '1 500 000 GNF');
-
-                        msgDiv.innerHTML = `✅ Inscription enregistrée !<br><br>
-                        Pour activer votre plan annuel, effectuez un dépôt Orange Money de <strong>${amount}</strong> au :<br>
-                        <strong style="font-size: 1.2rem; color: var(--violet-mid);">+224 627 27 13 97</strong><br><br>
-                        Votre accès sera validé par notre équipe dès réception.`;
-                        msgDiv.className = 'msg-error';
-                    }
+                if (res.ok) {
+                    msgDiv.innerHTML = `✅ Inscription réussie !<br>${plan === 'PASS' ? 'Votre essai de 2 jours est activé.' : 'Votre paiement est en attente de validation (24h max).'}`;
+                    msgDiv.className = 'msg-success';
                     msgDiv.style.display = 'block';
-                    form.reset();
+                    document.getElementById('registerForm').reset();
                     sectorChoices.removeActiveItems();
-                    setSegment('enterprise');
                 } else {
-                    msgDiv.textContent = "Erreur : " + (data.detail || "Vérifiez vos informations");
+                    msgDiv.innerHTML = `❌ Erreur : ${data.detail || 'Vérifiez vos informations'}`;
                     msgDiv.className = 'msg-error';
                     msgDiv.style.display = 'block';
                 }
-            } catch (error) {
-                msgDiv.textContent = "Serveur injoignable.";
+            } catch (e) {
+                msgDiv.innerHTML = "❌ Erreur serveur.";
                 msgDiv.className = 'msg-error';
                 msgDiv.style.display = 'block';
             } finally {
@@ -1831,18 +1953,64 @@
                 btnText.style.display = 'block';
                 loader.style.display = 'none';
             }
-        });
+        }
 
-        // Initialize
-        setSegment('enterprise');
-
-        // ===== SCROLL ANIMATIONS =====
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) entry.target.classList.add('visible');
+        // -- INIT --
+        document.addEventListener('DOMContentLoaded', () => {
+            // Choices JS Init
+            sectorChoices = new Choices('#sector', {
+                removeItemButton: true,
+                maxItemCount: 5,
+                searchEnabled: true,
+                placeholder: true,
+                placeholderValue: 'Cliquer pour choisir...',
+                searchPlaceholderValue: 'Rechercher...',
+                itemSelectText: '',
+                noChoicesText: 'Plus aucun choix disponible',
+                noResultsText: 'Aucun résultat trouvé',
+                allowHTML: true,
+                shouldSort: false
             });
-        }, { threshold: 0.1 });
-        document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+            
+            // Force first segment init
+            setSegment('enterprise');
+
+            // Form Submit Logic
+            document.getElementById('registerForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const plan = document.getElementById('subscription_plan').value;
+                if (plan !== 'PASS') {
+                    // Show modal for paid plans with dynamic pricing based on current segment
+                    const isFreelance = currentSegment === 'freelance';
+                    let priceText = '';
+                    if (plan === 'ENTRY') priceText = isFreelance ? '1 000 000 GNF' : '2 000 000 GNF';
+                    if (plan === 'ELITE') priceText = isFreelance ? '1 500 000 GNF' : '3 000 000 GNF';
+
+                    document.getElementById('modalPrice').textContent = priceText;
+                    document.getElementById('modalPlanName').textContent = plan;
+                    document.getElementById('paymentModal').classList.add('active');
+                } else {
+                    performFinalSubmit();
+                }
+            });
+
+            // Modal Confirm
+            document.getElementById('confirmPaymentBtn').addEventListener('click', () => {
+                window.closeModal();
+                performFinalSubmit();
+            });
+
+            // Email check on blur
+            document.getElementById('email').addEventListener('blur', checkTrialEligibility);
+
+            // Simple intersection observer for animations
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) entry.target.classList.add('visible');
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+        });
     </script>
 </body>
 </html>

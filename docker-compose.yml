@@ -11,9 +11,13 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://tender_user:tender_secret_password_2024@db:5432/tender_analyzer
     env_file:
       - .env
     volumes:
+      - ./app:/app/app
+      - ./scripts:/app/scripts
       - pdf_downloads:/app/downloads
       - app_logs:/app/logs
     depends_on:

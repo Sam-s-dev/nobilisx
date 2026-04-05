@@ -335,20 +335,21 @@ class EmailService:
         clean_name = self._clean_text(enterprise.name)
         
         if is_pending:
-            amount = "3 500 000" if plan_base == "ELITE" else "1 500 000"
+            amount = "3 000 000" if plan_base == "ELITE" else "2 000 000"
             message_body = f"""
     <p style="color: #c9d1d9; line-height: 1.6;">Votre pré-inscription pour le plan <strong>NOBILIS {plan_base}</strong> a bien été enregistrée.</p>
     <div style="background: rgba(201,168,76,0.1); border: 1px solid #c9a84c; padding: 16px; border-radius: 8px; margin: 20px 0;">
         <h3 style="color: #c9a84c; margin-top: 0;">Action requise : Paiement Orange Money</h3>
         <p style="color: #fff; line-height: 1.6; margin-bottom: 0;">Pour activer votre abonnement et commencer à recevoir vos rapports, veuillez effectuer un dépôt de <strong>{amount} GNF</strong> au numéro suivant :</p>
         <p style="color: #c9a84c; font-size: 24px; font-weight: bold; text-align: center; margin: 10px 0;">+224 627 27 13 97</p>
-        <p style="color: #8b949e; font-size: 13px; margin: 0; text-align: center;">Veuillez nous envoyer une capture d'écran du paiement sur WhatsApp à ce même numéro pour une activation immédiate.</p>
+        <p style="color: #8b949e; font-size: 13px; margin: 0; text-align: center;">Dites "NOBILIS" lors du dépôt ou envoyez la capture sur WhatsApp à ce numéro pour une activation immédiate.</p>
     </div>
             """
         else:
-            message_body = """
-    <p style="color: #c9d1d9; line-height: 1.6;">Votre inscription est confirmée. Vous recevrez désormais vos rapports personnalisés chaque matin à 8h00.</p>
-    <p style="color: #c9d1d9; line-height: 1.6;">NOBILIS X analyse en continu les sources officielles (JAO, DGCMP, TELEMO) et calcule votre <strong style="color: #c9a84c;">Indice de Crédibilité</strong> pour chaque opportunité.</p>
+            message_body = f"""
+    <p style="color: #c9d1d9; line-height: 1.6;"><strong>Félicitations ! Votre paiement a été validé et votre abonnement NOBILIS {plan_base} est désormais actif.</strong></p>
+    <p style="color: #c9d1d9; line-height: 1.6;">Vous recevrez désormais vos rapports stratégiques personnalisés chaque matin à 8h00 dans votre boîte mail.</p>
+    <p style="color: #c9d1d9; line-height: 1.6;">NOBILIS X analyse pour vous les sources officielles et calcule votre <strong>Indice de Crédibilité</strong> en continu.</p>
             """
         
         html_body = f"""<!DOCTYPE html>

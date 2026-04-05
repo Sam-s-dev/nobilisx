@@ -20,9 +20,10 @@ class Individual(Base):
     
     # 3. email
     email = Column(String(255), nullable=False, index=True)
+    whatsapp = Column(String(50), nullable=True) # WhatsApp (+224...)
     
     # 4. country
-    country = Column(String(100), nullable=False)
+    country = Column(String(100), nullable=False, default="Guinée")
     
     # 5. domain
     domain = Column(String(255), nullable=False)

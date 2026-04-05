@@ -56,7 +56,20 @@ def create_enterprise(
     data["sector"] = ", ".join(sectors_list) if sectors_list else sector_raw
     
     # Gestion du statut en attente pour les plans payants
-    if client_plan in ["ENTRY", "ELITE"]:
+    client_plan = (enterprise_data.subscription_plan or "PASS").upper()
+    
+    if client_plan == "PASS":
+        # Vérifier si l'email a déjà été utilisé pour un compte (Entreprise ou Particulier)
+        from app.models.individual import Individual
+        already_ent = db.query(Enterprise).filter(Enterprise.email == enterprise_data.email).first()
+        already_ind = db.query(Individual).filter(Individual.email == enterprise_data.email).first()
+        if already_ent or already_ind:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Cet email a déjà bénéficié d'un essai gratuit ou d'un compte existant."
+            )
+        data["subscription_plan"] = "PASS"
+    elif client_plan in ["ENTRY", "ELITE"]:
         data["subscription_plan"] = f"PENDING_{client_plan}"
     else:
         data["subscription_plan"] = "PASS"

@@ -67,7 +67,6 @@ class ScraperService:
 
     def __init__(self, db: Session):
         self.db = db
-        self.dgcmp_url = settings.DGCMP_BASE_URL
         self.telemo_url = settings.TELEMO_BASE_URL
         self.jao_url = settings.JAO_BASE_URL
         self.session = requests.Session()
@@ -144,21 +143,7 @@ class ScraperService:
             logger.error(f"❌ Échec téléchargement PDF {url}: {e}")
             return None
 
-    # --- Parsers existants (DGCMP désactivable) ---
-
-    def _parse_dgcmp_listings(self, html: str) -> list[dict]:
-        if not html: return []
-        soup = BeautifulSoup(html, "html.parser")
-        tenders = []
-        tables = soup.find_all("table")
-        for table in tables:
-            rows = table.find_all("tr")
-            for row in rows[1:]:
-                cells = row.find_all("td")
-                if len(cells) >= 2:
-                    tender_data = self._extract_from_table_row(cells, self.dgcmp_url)
-                    if tender_data: tenders.append(tender_data)
-        return tenders
+    # --- Parsers existants ---
 
     def _parse_telemo_listings(self, html: str) -> list[dict]:
         if not html: return []
@@ -220,19 +205,6 @@ class ScraperService:
             })
         return tenders
 
-    def _extract_from_table_row(self, cells: list, base_url: str) -> dict | None:
-        try:
-            link = cells[0].find("a")
-            if not link or not link.get("href"): return None
-            href = link["href"]
-            return {
-                "title": cells[0].get_text(strip=True)[:500],
-                "description": cells[1].get_text(strip=True)[:2000] if len(cells) > 1 else "",
-                "source_url": href if href.startswith("http") else f"{base_url}{href}",
-                "deadline_str": cells[2].get_text(strip=True) if len(cells) > 2 else None,
-            }
-        except: return None
-
     def _tender_exists(self, source_url: str) -> bool:
         return self.db.query(Tender).filter(Tender.source_url == source_url).first() is not None
 
@@ -249,7 +221,7 @@ class ScraperService:
         return False
 
     def scrape_tenders(self, force: bool = False) -> list[Tender]:
-        """Exécute le scraping (JAO + Telemo, DGCMP facultatif)."""
+        """Exécute le scraping (JAO + Telemo)."""
         if not force and not self._is_scraping_window():
             logger.info("🚫 Hors fenêtre de scraping (Samedi 22h-02h). Scraping annulé.")
             return []
@@ -277,13 +249,6 @@ class ScraperService:
             all_tender_data.extend(self._parse_telemo_listings(html))
         except Exception as e: logger.warning(f"Telemo error: {e}")
 
-        # 3. DGCMP (Si activé)
-        if settings.DGCMP_ENABLED:
-            try:
-                html = self._fetch_page(self.dgcmp_url)
-                all_tender_data.extend(self._parse_dgcmp_listings(html))
-            except: pass
-
         # Stockage
         new_tenders = []
         for td in all_tender_data:
@@ -297,6 +262,8 @@ class ScraperService:
                     is_analyzed=False,
                 )
                 self.db.add(tender)
+                self.db.flush() # Pour avoir l'ID
+                logger.info(f"➕ Debug: Tender added with ID {tender.id}")
                 new_tenders.append(tender)
         
         self.db.commit()
