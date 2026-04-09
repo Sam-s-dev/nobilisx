@@ -133,6 +133,103 @@ def job_elite_realtime_alert():
         logger.error(f"ERREUR ALERTE ELITE: {e}", exc_info=True)
 
 
+def job_check_expirations():
+    """
+    L'Horloge Nobilis : Vérifie les expirations toutes les 2 heures.
+    - PASS : 48h (2 jours)
+    - ENTRY/ELITE : 1 an (365 jours)
+    Bloque l'envoi des rapports si expiré.
+    """
+    logger.info("🕒 NOBILIS X — VERIFICATION DES EXPIRATIONS...")
+    try:
+        from app.models.enterprise import Enterprise
+        from app.models.individual import Individual
+        now = datetime.utcnow()
+
+        with get_db_context() as db:
+            # 1. Entreprises
+            expired_ent = db.query(Enterprise).filter(
+                Enterprise.subscription_expires_at < now,
+                ~Enterprise.subscription_plan.like("SUSPENDED_%")
+            ).all()
+
+            for ent in expired_ent:
+                old_plan = ent.subscription_plan
+                ent.subscription_plan = f"SUSPENDED_{old_plan}"
+                logger.warning(f"🚫 Compte Entreprise SUSPENDU (Expiré) : {ent.name} (Plan final: {ent.subscription_plan})")
+
+            # 2. Individus
+            expired_ind = db.query(Individual).filter(
+                Individual.subscription_expires_at < now,
+                ~Individual.subscription_plan.like("SUSPENDED_%")
+            ).all()
+
+            for ind in expired_ind:
+                old_plan = ind.subscription_plan
+                ind.subscription_plan = f"SUSPENDED_{old_plan}"
+                logger.warning(f"🚫 Compte Particulier SUSPENDU (Expiré) : {ind.full_name} (Plan final: {ind.subscription_plan})")
+
+            db.commit()
+            if expired_ent or expired_ind:
+                logger.info(f"✅ Total suspension effectuée : {len(expired_ent) + len(expired_ind)}")
+            else:
+                logger.info("✅ Aucun compte expiré détecté.")
+
+    except Exception as e:
+        logger.error(f"ERREUR JOB EXPIRATION: {e}", exc_info=True)
+
+
+def job_daily_reminders():
+    """
+    Job quotidien (9h00) pour envoyer les rappels d'expiration
+    - 7 jours avant
+    - 3 jours avant
+    """
+    logger.info("=" * 60)
+    logger.info(f"NOBILIS X — ENVOI DES RAPPELS D'EXPIRATION | {datetime.now().isoformat()}")
+    logger.info("=" * 60)
+
+    try:
+        from app.models.enterprise import Enterprise
+        from app.models.individual import Individual
+        now_date = datetime.utcnow().date()
+
+        with get_db_context() as db:
+            email_service_ent = EmailService(db)
+            email_service_ind = IndividualEmailService(db)
+
+            # 1. Parcourir les Entreprises
+            ents = db.query(Enterprise).filter(
+                Enterprise.subscription_expires_at.isnot(None),
+                ~Enterprise.subscription_plan.like("SUSPENDED_%")
+            ).all()
+
+            for ent in ents:
+                if not ent.subscription_expires_at:
+                    continue
+                days_left = (ent.subscription_expires_at.date() - now_date).days
+                if days_left in [7, 3]:
+                    logger.info(f"📧 Envoi rappel ({days_left} jours) à l'entreprise {ent.name}")
+                    email_service_ent.send_expiration_reminder(ent, days_left)
+
+            # 2. Parcourir les Particuliers
+            inds = db.query(Individual).filter(
+                Individual.subscription_expires_at.isnot(None),
+                ~Individual.subscription_plan.like("SUSPENDED_%")
+            ).all()
+
+            for ind in inds:
+                if not ind.subscription_expires_at:
+                    continue
+                days_left = (ind.subscription_expires_at.date() - now_date).days
+                if days_left in [7, 3]:
+                    logger.info(f"📧 Envoi rappel ({days_left} jours) au particulier {ind.full_name}")
+                    email_service_ind.send_expiration_reminder(ind, days_left)
+
+    except Exception as e:
+        logger.error(f"ERREUR JOB RAPPELS EXPIRATION: {e}", exc_info=True)
+
+
 def scheduler_event_listener(event):
     if event.exception:
         logger.error(f"Job {event.job_id} a échoué: {event.exception}")
@@ -168,6 +265,24 @@ def init_scheduler():
         trigger=CronTrigger(hour="8,18", minute=45),
         id="elite_realtime",
         name="NOBILIS X — Alertes ELITE",
+        replace_existing=True,
+    )
+
+    # 4. HORLOGE NOBILIS : Toutes les 2 heures (pour être réactif sur l'essai de 48h)
+    scheduler.add_job(
+        func=job_check_expirations,
+        trigger=CronTrigger(hour="*/2"),
+        id="check_expirations",
+        name="NOBILIS X — Horloge Expirations & Abonnements",
+        replace_existing=True,
+    )
+
+    # 5. RAPPELS D'EXPIRATION : Tous les jours à 9h00
+    scheduler.add_job(
+        func=job_daily_reminders,
+        trigger=CronTrigger(hour=9, minute=0),
+        id="daily_reminders",
+        name="NOBILIS X — Rappels d'expiration (7j / 3j)",
         replace_existing=True,
     )
 

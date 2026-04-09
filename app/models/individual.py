@@ -56,7 +56,9 @@ class Individual(Base):
     exclude_keywords = Column(Text, nullable=True)
     
     # 15. subscription_plan
+    logo_data = Column(Text, nullable=True, comment="Contenu Base64 du logo")
     subscription_plan = Column(String(20), default="PASS", nullable=False)
+    subscription_expires_at = Column(DateTime, nullable=True, comment="Date d'expiration")
     
     # 16. created_at
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -64,8 +66,9 @@ class Individual(Base):
     # 17. updated_at
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relation avec les logs emails
+    # Relations
     email_logs = relationship("EmailLog", back_populates="individual")
+    subscriptions = relationship("Subscription", back_populates="individual", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Individual(name={self.full_name}, email={self.email}, plan={self.subscription_plan})>"

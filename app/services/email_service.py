@@ -381,6 +381,53 @@ class EmailService:
             self.db.commit()
             return False
 
+    def send_expiration_reminder(self, enterprise: Enterprise, days_left: int) -> bool:
+        """Envoie un rappel d'expiration à l'entreprise."""
+        if not enterprise.email:
+            return False
+
+        subject = f"⚠️ NOBILIS X - Ton abonnement expire dans {days_left} jours"
+        clean_name = self._clean_text(enterprise.name)
+
+        message_body = f"""
+    <p style="color: #c9d1d9; line-height: 1.6;"><strong>Attention {clean_name},</strong> ton abonnement <strong>NOBILIS X</strong> arrive à expiration dans <strong>{days_left} jours</strong>.</p>
+    <p style="color: #c9d1d9; line-height: 1.6;">Pour ne pas perdre ton accès aux rapports exclusifs et conserver ton avance sur le marché, pense à renouveler ton abonnement avant la coupure.</p>
+    <div style="background: rgba(201,168,76,0.1); border: 1px solid #c9a84c; padding: 16px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="color: #c9a84c; margin-top: 0;">Comment renouveler ?</h3>
+        <p style="color: #fff; line-height: 1.6; margin-bottom: 0;">Effectue un dépôt Orange Money au numéro suivant :</p>
+        <p style="color: #c9a84c; font-size: 24px; font-weight: bold; text-align: center; margin: 10px 0;">+224 627 27 13 97</p>
+        <p style="color: #8b949e; font-size: 13px; margin: 0; text-align: center;">Envoie ensuite la capture sur WhatsApp pour prolonger automatiquement ton compte.</p>
+    </div>
+        """
+        
+        html_body = f"""<!DOCTYPE html>
+<html lang="fr"><body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 20px; background: #0d1117; color: #fff;">
+    <div style="max-width: 500px; margin: 0 auto; background: #161b22; padding: 40px; border-radius: 16px; border: 1px solid #30363d;">
+    <h1 style="color: #c9a84c; font-size: 28px; margin: 0 0 4px 0;">NOBILIS X</h1>
+    <p style="color: #8b949e; font-size: 12px; margin: 0 0 24px 0; letter-spacing: 1px;">L'INTELLIGENCE DES MARCHÉS</p>
+    {message_body}
+    <hr style="border: 1px solid #30363d; margin: 24px 0;">
+    <p style="color: #8b949e; font-size: 13px;">📧 trillionnx@gmail.com | 📞 +224 627 27 13 97</p>
+    <p style="color: #8b949e; font-size: 12px;">Fait en Guinée. Conçu pour que les meilleurs gagnent.</p>
+    </div>
+</body></html>"""
+
+        email_log = EmailLog(enterprise_id=enterprise.id, recipient_email=enterprise.email, subject=self._clean_subject(subject), status="pending")
+        self.db.add(email_log)
+        self.db.flush()
+        
+        try:
+            self._send_mailjet_http(enterprise.email, subject, html_body)
+            email_log.status = "sent"
+            email_log.sent_at = datetime.utcnow()
+            self.db.commit()
+            return True
+        except Exception as e:
+            email_log.status = "failed"
+            email_log.error_message = str(e)[:500]
+            self.db.commit()
+            return False
+
     def send_all_daily_reports(self) -> dict:
         from datetime import timedelta
         from app.services.scorer import ScorerService
@@ -404,10 +451,10 @@ class EmailService:
                     results["skipped"] += 1
                     continue
                 
-                # Bloquer les PASS expirés (essai de 2 jours)
+                # Bloquer les PASS expirés (essai de 1 semaine)
                 if plan.upper() == "PASS":
                     from datetime import datetime as dt
-                    if dt.utcnow() > enterprise.created_at + timedelta(days=2):
+                    if dt.utcnow() > enterprise.created_at + timedelta(days=7):
                         logger.info(f"PASS expire pour {enterprise.name} — rapport ignore")
                         results["skipped"] += 1
                         continue

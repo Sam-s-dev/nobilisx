@@ -23,7 +23,9 @@ class IndividualBase(BaseModel):
     portfolio_url: Optional[str] = Field(None, max_length=500)
     bio: Optional[str] = Field(None, description="Courte présentation 2–4 lignes")
     exclude_keywords: Optional[str] = Field(None, description="Mots-clés à exclure")
+    logo_data: Optional[str] = Field(None, description="Contenu Base64 du logo")
     subscription_plan: str = Field("PASS", description="PASS / ENTRY / ELITE")
+    subscription_expires_at: Optional[datetime] = Field(None, description="Date d'expiration")
 
 
 class IndividualCreate(IndividualBase):

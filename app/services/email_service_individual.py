@@ -378,6 +378,58 @@ class IndividualEmailService:
             self.db.commit()
             return False
 
+    def send_expiration_reminder(self, individual: Individual, days_left: int) -> bool:
+        """Envoie un rappel d'expiration au particulier."""
+        if not individual.email:
+            return False
+
+        subject = f"⚠️ NOBILIS X - Ton abonnement expire dans {days_left} jours"
+        clean_name = self._clean_text(individual.full_name.split()[0])
+
+        message_body = f"""
+    <p style="color:#e2e8f0;line-height:1.7;font-size:14px;"><strong>Attention {clean_name},</strong> ton abonnement <strong style="color:#a78bfa;">NOBILIS X</strong> expire dans <strong>{days_left} jours</strong>.</p>
+    <p style="color:#e2e8f0;line-height:1.7;font-size:14px;">Renouvelle-le dès maintenant pour continuer à recevoir tes offres de missions freelance exclusives chaque lundi !</p>
+    <div style="background:rgba(124,58,237,0.1);border:1px solid #7c3aed;padding:18px;border-radius:12px;margin:20px 0;">
+        <h3 style="color:#a78bfa;margin-top:0;font-size:16px;">Comment renouveler ?</h3>
+        <p style="color:#fff;line-height:1.6;margin-bottom:0;font-size:14px;">Fais un dépôt Orange Money au :</p>
+        <p style="color:#a78bfa;font-size:22px;font-weight:bold;text-align:center;margin:12px 0;">+224 627 27 13 97</p>
+        <p style="color:#94a3b8;font-size:12px;margin:0;text-align:center;">Envoie ensuite la capture sur WhatsApp pour prolonger automatiquement ton compte.</p>
+    </div>
+        """
+
+        html_body = f"""<!DOCTYPE html>
+<html lang="fr"><body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;background:#0f0b2e;color:#fff;">
+    <div style="max-width:500px;margin:0 auto;background:#1e1b4b;padding:40px;border-radius:20px;border:1px solid #312e81;">
+    <h1 style="color:#a78bfa;font-size:26px;margin:0 0 4px 0;font-weight:900;">NOBILIS X</h1>
+    <p style="color:#6366f1;font-size:11px;margin:0 0 24px 0;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;">Missions Freelance</p>
+    {message_body}
+    <hr style="border:1px solid #312e81;margin:24px 0;">
+    <p style="color:#6366f1;font-size:12px;">trillionnx@gmail.com | +224 627 27 13 97</p>
+    <p style="color:#4338ca;font-size:11px;">Fait en Guinee. Concu pour que les meilleurs gagnent.</p>
+    </div>
+</body></html>"""
+
+        email_log = EmailLog(
+            individual_id=individual.id,
+            recipient_email=individual.email,
+            subject=self._clean_subject(subject),
+            status="pending",
+        )
+        self.db.add(email_log)
+        self.db.flush()
+
+        try:
+            self._send_mailjet_http(individual.email, subject, html_body)
+            email_log.status = "sent"
+            email_log.sent_at = datetime.utcnow()
+            self.db.commit()
+            return True
+        except Exception as e:
+            email_log.status = "failed"
+            email_log.error_message = str(e)[:500]
+            self.db.commit()
+            return False
+
     # ------------------------------------------------------------------
     #  Rapport hebdomadaire — Particulier
     # ------------------------------------------------------------------
@@ -449,9 +501,9 @@ class IndividualEmailService:
                     results["skipped"] += 1
                     continue
 
-                # ── Bloquer les PASS expirés (essai 2 jours) ──
+                # ── Bloquer les PASS expirés (essai 1 semaine) ──
                 if plan == "PASS":
-                    if datetime.utcnow() > individual.created_at + timedelta(days=2):
+                    if datetime.utcnow() > individual.created_at + timedelta(days=7):
                         logger.info(f"⏸️ PASS expiré pour {individual.full_name} — rapport ignoré")
                         results["skipped"] += 1
                         continue

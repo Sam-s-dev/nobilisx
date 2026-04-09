@@ -5,8 +5,11 @@ CRUD complet + email de bienvenue automatique à l'inscription.
 """
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
+
+from app.limiter import limiter
 
 from app.database import get_db
 from app.models.individual import Individual
@@ -27,7 +30,9 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED,
     summary="Inscrire un particulier",
 )
+@limiter.limit("5/minute")
 def create_individual(
+    request: Request,
     data: IndividualCreate,
     db: Session = Depends(get_db),
 ):
@@ -65,6 +70,11 @@ def create_individual(
     else:
         payload["subscription_plan"] = "PASS"
 
+    # ── Calcul de l'expiration Nobilis ──
+    client_plan_clean = client_plan.replace("PENDING_", "")
+    duration = 7 if client_plan_clean == "PASS" else 365
+    payload["subscription_expires_at"] = datetime.utcnow() + timedelta(days=duration)
+
     individual = Individual(**payload)
     db.add(individual)
     db.commit()
@@ -72,7 +82,7 @@ def create_individual(
 
     logger.info(
         f"👤 Particulier inscrit: {individual.full_name} "
-        f"(id={individual.id}, plan={payload['subscription_plan']}, domaine={individual.domain})"
+        f"(id={individual.id}, plan={payload['subscription_plan']}, expires={payload['subscription_expires_at']})"
     )
 
     # Envoi de l'email de bienvenue

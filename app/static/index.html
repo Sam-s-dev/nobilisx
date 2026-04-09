@@ -1009,13 +1009,21 @@
             transform: translate(-50%, -50%);
         }
         .choices__button:hover { opacity: 1 !important; }
-        .choices__list--dropdown {
+        .choices__list--dropdown,
+        .choices__list[aria-expanded] {
             border-radius: 14px !important;
             border: 1px solid var(--border) !important;
             box-shadow: var(--shadow-lg) !important;
             margin-top: 8px !important;
             overflow: hidden !important;
             z-index: 100 !important;
+            display: none !important;
+        }
+        .choices.is-open .choices__list--dropdown,
+        .choices.is-open .choices__list[aria-expanded] {
+            display: block !important;
+            max-height: 250px !important;
+            overflow-y: auto !important;
         }
         .choices__item--selectable.is-highlighted {
             background-color: var(--violet-xsoft) !important;
@@ -1373,7 +1381,7 @@
             <div class="pricing-grid">
                 <!-- PASS -->
                 <div class="price-card fade-in">
-                    <span class="featured-badge" style="background: linear-gradient(135deg,#059669,#047857);">2 JOURS OFFERTS</span>
+                    <span class="featured-badge" style="background: linear-gradient(135deg,#059669,#047857);">1 SEMAINE OFFERTE</span>
                     <div class="price-tier">Essai Gratuit</div>
                     <div class="price-name">NOBILIS PASS</div>
                     <div class="price-amount">0 GNF</div>
@@ -1467,7 +1475,7 @@
         <div class="container">
             <p class="section-label fade-in">Notre ADN</p>
             <h2 class="section-title fade-in">Pourquoi NOBILIS X ?</h2>
-            <p class="section-desc fade-in">Quatre piliers fondateurs qui font de nous le partenaire de référence pour la croissance des entreprises guinéennes.</p>
+            <p class="section-desc fade-in">Quatre piliers fondateurs qui font de nous le partenaire de référence pour la croissance des entreprises et particuliers en Guinée.</p>
             <div class="values-grid">
                 <div class="value-card fade-in">
                     <div class="value-num">01 / Noblesse</div>
@@ -1511,7 +1519,7 @@
                 <div class="plan-selector">
                     <div class="plan-option active" data-plan="PASS" onclick="selectPlan('PASS')">
                         <div class="plan-opt-name">PASS</div>
-                        <div class="plan-opt-price">Gratuit • 2 jours</div>
+                        <div class="plan-opt-price">Gratuit • 1 semaine</div>
                     </div>
                     <div class="plan-option" data-plan="ENTRY" onclick="selectPlan('ENTRY')">
                         <div class="plan-opt-name">ENTRY</div>
@@ -1537,8 +1545,8 @@
                             <input type="text" id="whatsapp" name="whatsapp" placeholder="+224 627 27 13 97">
                         </div>
                         <div class="form-group">
-                            <label for="portfolio_url">Lien Portfolio / LinkedIn / GitHub</label>
-                            <input type="url" id="portfolio_url" name="portfolio_url" placeholder="https://votre-portfolio.com">
+                            <label for="portfolio_url">Lien Portfolio / LinkedIn / GitHub <span style="color: var(--text-muted); font-size: 0.8rem; font-weight: normal;">(Facultatif)</span></label>
+                            <input type="url" id="portfolio_url" name="portfolio_url" placeholder="Ex: https://github.com/mohamed-sams-deen">
                         </div>
                         <div class="grid-2">
                             <div class="form-group">
@@ -1685,7 +1693,7 @@
         <p style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-bottom: 14px;"><i class="fas fa-map-marker-alt"></i> Conakry, Guinée</p>
         <div class="footer-badges">
             <span class="footer-badge"><i class="fas fa-check-circle"></i> Activation sous 24h</span>
-            <span class="footer-badge"><i class="fas fa-check-circle"></i> 2 jours d'essai gratuit</span>
+            <span class="footer-badge"><i class="fas fa-check-circle"></i> 1 semaine d'essai gratuit</span>
             <span class="footer-badge"><i class="fas fa-check-circle"></i> Résultats dès le 1er jour</span>
         </div>
         <p class="footer-made">
@@ -1761,7 +1769,8 @@
             { value: 'Data', label: 'Data Science & IA' },
             { value: 'Writing', label: 'Rédaction & Traduction' },
             { value: 'Strategy', label: 'Conseil & Stratégie' },
-            { value: 'Video', label: 'Vidéo & Animation' }
+            { value: 'Video', label: 'Vidéo & Animation' },
+            { value: 'journalisme et communication', label: 'Journalisme et Communication' }
         ];
 
         // -- UTILITIES --
@@ -1925,6 +1934,22 @@
                 };
             }
 
+            // --- GESTION LOGO (Base64) ---
+            const logoFile = document.getElementById('logo').files[0];
+            if (!isFreelance && logoFile) {
+                try {
+                    const base64Logo = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(logoFile);
+                    });
+                    payload.logo_data = base64Logo;
+                } catch (e) {
+                    console.error("Erreur conversion logo:", e);
+                }
+            }
+
             try {
                 const res = await fetch(endpoint, {
                     method: 'POST',
@@ -1934,7 +1959,7 @@
                 const data = await res.json();
 
                 if (res.ok) {
-                    msgDiv.innerHTML = `✅ Inscription réussie !<br>${plan === 'PASS' ? 'Votre essai de 2 jours est activé.' : 'Votre paiement est en attente de validation (24h max).'}`;
+                    msgDiv.innerHTML = `✅ Inscription réussie !<br>${plan === 'PASS' ? 'Votre essai de 1 semaine est activé.' : 'Votre paiement est en attente de validation (24h max).'}`;
                     msgDiv.className = 'msg-success';
                     msgDiv.style.display = 'block';
                     document.getElementById('registerForm').reset();
@@ -2010,6 +2035,34 @@
                 });
             }, { threshold: 0.1 });
             document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+            
+            // --- GESTION PREVIEW LOGO ---
+            const logoInput = document.getElementById('logo');
+            const dropArea = document.getElementById('logoDropArea');
+            const preview = document.getElementById('logoPreview');
+            const filenameText = document.getElementById('logoFilename');
+
+            if (logoInput && dropArea) {
+                logoInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        dropArea.classList.add('has-file');
+                        filenameText.textContent = file.name;
+                        filenameText.style.display = 'block';
+
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            preview.src = e.target.result;
+                            preview.style.display = 'block';
+                        };
+                        reader.readAsDataURL(file);
+                    } else {
+                        dropArea.classList.remove('has-file');
+                        filenameText.style.display = 'none';
+                        preview.style.display = 'none';
+                    }
+                });
+            }
         });
     </script>
 </body>

@@ -11,11 +11,18 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.config import get_settings
 from app.database import init_db
 from app.routers import enterprises, tenders, analyses, individuals, auth, admin
 from app.scheduler.jobs import init_scheduler, shutdown_scheduler
+from app.limiter import limiter
 
 # Configuration du logging
 import os
@@ -36,13 +43,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# === Configuration Sentry (Connecteur de Surveillance) ===
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        integrations=[FastApiIntegration()],
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,
+    )
+    logger.info("✅ Connecteur Sentry active")
+
+# === Configuration Rate Limiter ===
+# Le limiteur est importé depuis app.limiter pour éviter les imports circulaires
+app_limiter = limiter
+
 
 # === Lifespan : startup + shutdown ===
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gestion du cycle de vie de l'application"""
     # --- STARTUP ---
-    logger.info("🚀 Démarrage de NOBILIS X")
+    logger.info(" Démarrage de NOBILIS X")
     logger.info(f"   Version: {settings.APP_VERSION}")
     logger.info(f"   Debug: {settings.DEBUG}")
 
@@ -100,6 +121,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Montage du limiteur
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # === Montage des fichiers statiques ===
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

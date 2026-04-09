@@ -26,7 +26,9 @@ class Enterprise(Base):
     specific_keywords = Column(Text, nullable=True, comment="Mots-clés spécifiques recherchés")
     exclude_keywords = Column(Text, nullable=True, comment="Mots-clés à exclure")
     logo_url = Column(String(500), nullable=True, comment="URL du logo de l'entreprise")
+    logo_data = Column(Text, nullable=True, comment="Contenu Base64 du logo")
     subscription_plan = Column(String(20), nullable=False, default="PASS", comment="Plan: PASS | ENTRY | ELITE")
+    subscription_expires_at = Column(DateTime, nullable=True, comment="Date d'expiration")
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

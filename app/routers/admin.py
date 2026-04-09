@@ -4,14 +4,18 @@ Router Administration - Validation des paiements Orange Money
 """
 
 import logging
+from datetime import datetime, timedelta
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.enterprise import Enterprise
 from app.models.individual import Individual
 from app.services.email_service import EmailService
 from app.services.email_service_individual import IndividualEmailService
+from app.config import get_settings
+
+from app.limiter import limiter
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -22,14 +26,26 @@ router = APIRouter(
     tags=["Administration"],
 )
 
-def verify_admin(x_admin_password: Optional[str] = Header(None)):
-    """Vérifie le mot de passe admin dans les headers"""
-    if not x_admin_password or x_admin_password != settings.ADMIN_PASSWORD:
-        raise HTTPException(status_code=401, detail="Accès non autorisé : Mot de passe admin incorrect.")
+def verify_admin(x_admin_password: Optional[str] = Header(None, alias="X-Admin-Password")):
+    """Vérifie le mot de passe admin dans les headers (robuste aux espaces)"""
+    if not x_admin_password:
+        logger.warning("❌ Tentative d'accès admin sans header X-Admin-Password")
+        raise HTTPException(status_code=401, detail="Header d'authentification manquant.")
+    
+    # Nettoyage des espaces pour éviter les erreurs de copier-coller
+    provided = x_admin_password.strip()
+    expected = settings.ADMIN_PASSWORD.strip()
+    
+    if provided != expected:
+        logger.warning(f"❌ Échec auth admin. Reçu: {len(provided)} chars, Attendu: {len(expected)} chars.")
+        raise HTTPException(status_code=401, detail="Mot de passe admin incorrect.")
+    
     return True
 
 @router.get("/list")
+@limiter.limit("20/minute")
 def list_all_users(
+    request: Request,
     db: Session = Depends(get_db),
     authorized: bool = Depends(verify_admin)
 ):
@@ -60,7 +76,8 @@ def list_all_users(
             "email": ent.email,
             "plan": plan.replace("PENDING_", "").replace("SUSPENDED_", ""),
             "status": status,
-            "created_at": ent.created_at.isoformat() if ent.created_at else None
+            "created_at": ent.created_at.isoformat() if ent.created_at else None,
+            "expires_at": ent.subscription_expires_at.isoformat() if ent.subscription_expires_at else None
         })
         
     for ind in inds:
@@ -79,7 +96,8 @@ def list_all_users(
             "email": ind.email,
             "plan": plan.replace("PENDING_", "").replace("SUSPENDED_", ""),
             "status": status,
-            "created_at": ind.created_at.isoformat() if ind.created_at else None
+            "created_at": ind.created_at.isoformat() if ind.created_at else None,
+            "expires_at": ind.subscription_expires_at.isoformat() if ind.subscription_expires_at else None
         })
         
     # Trier par date (plus récent en haut)
@@ -87,7 +105,9 @@ def list_all_users(
     return results
 
 @router.post("/validate")
+@limiter.limit("5/minute")
 def validate_user_payment(
+    request: Request,
     email: str,
     user_type: str, # 'enterprise' or 'individual'
     db: Session = Depends(get_db),
@@ -114,9 +134,20 @@ def validate_user_payment(
         return {"message": "L'utilisateur est déjà actif.", "plan": new_plan}
         
     user.subscription_plan = new_plan
+    
+    # Extension de l'abonnement (1 an / 365 jours)
+    # Si le compte n'est pas encore expiré, on ajoute un an à la date de fin
+    now = datetime.utcnow()
+    duration = timedelta(days=365)
+    
+    if user.subscription_expires_at and user.subscription_expires_at > now:
+        user.subscription_expires_at += duration
+    else:
+        user.subscription_expires_at = now + duration
+    
     db.commit()
     
-    logger.info(f"✅ Compte activé/rétabli pour {email} ({user_type}). Plan: {new_plan}")
+    logger.info(f"✅ Compte activé/rétabli pour {email} ({user_type}). Plan: {new_plan}. Expire: {user.subscription_expires_at}")
     
     # Envoyer l'email de bienvenue/confirmation
     email_sent = False

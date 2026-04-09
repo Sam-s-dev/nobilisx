@@ -56,10 +56,11 @@ class IndividualScorerService:
             "branding", "logo", "wireframe", "prototype", "sketch",
             "adobe xd", "canva", "graphic", "web design", "visual",
         ],
-        "rédaction/journalisme": [
+        "journalisme et communication": [
             "rédaction", "copywriting", "seo", "content", "blog",
             "article", "journalisme", "presse", "édition", "relecture",
             "ghostwriting", "storytelling", "newsletter", "rédacteur",
+            "communication", "pr", "relations presse", "médias",
         ],
         "marketing digital": [
             "seo", "sem", "google ads", "facebook ads", "social media",

@@ -20,7 +20,9 @@ class EnterpriseBase(BaseModel):
     specific_keywords: str | None = Field(None, description="Mots-clés spécifiques (séparés par virgules)")
     exclude_keywords: str | None = Field(None, description="Mots-clés à exclure (séparés par virgules)")
     logo_url: str | None = Field(None, description="URL du logo de l'entreprise")
+    logo_data: str | None = Field(None, description="Contenu Base64 du logo")
     subscription_plan: str = Field("PASS", description="Plan d'abonnement: PASS, ENTRY ou ELITE")
+    subscription_expires_at: datetime | None = Field(None, description="Date d'expiration")
 
     @field_validator("max_budget")
     @classmethod

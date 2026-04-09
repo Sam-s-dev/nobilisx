@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "2.0.0"
     CONTACT_EMAIL: str = "trillionn@gmail.com"
     CONTACT_PHONE: str = "+224 627 27 13 97"
-    ADMIN_PASSWORD: str = "nobilis_admin_2024"
+    ADMIN_PASSWORD: str = "Nobilis2026"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
 
@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     JAO_BASE_URL: str = "https://www.jaoguinee.com"
     SCRAPE_SCHEDULE_HOUR: int = 7
     EMAIL_SCHEDULE_HOUR: int = 8
+
+    # --- Monitoring ---
+    SENTRY_DSN: str = ""
 
     # --- Retry ---
     MAX_RETRY_ATTEMPTS: int = 3

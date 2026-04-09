@@ -6,8 +6,11 @@ Endpoints pour la gestion des entreprises
 import logging
 import os
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
 from sqlalchemy.orm import Session
+
+from app.limiter import limiter
 
 from app.database import get_db
 from app.models.enterprise import Enterprise
@@ -32,7 +35,9 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED,
     summary="Creer une entreprise",
 )
+@limiter.limit("5/minute")
 def create_enterprise(
+    request: Request,
     enterprise_data: EnterpriseCreate,
     db: Session = Depends(get_db),
 ):
@@ -74,11 +79,16 @@ def create_enterprise(
     else:
         data["subscription_plan"] = "PASS"
 
+    # ── Calcul de l'expiration Nobilis ──
+    client_plan_clean = client_plan.replace("PENDING_", "")
+    duration = 7 if client_plan_clean == "PASS" else 365
+    data["subscription_expires_at"] = datetime.utcnow() + timedelta(days=duration)
+
     enterprise = Enterprise(**data)
     db.add(enterprise)
     db.commit()
     db.refresh(enterprise)
-    logger.info(f"Entreprise creee: {enterprise.name} (id={enterprise.id}, plan={data['subscription_plan']}, secteurs={len(sectors_list)})")
+    logger.info(f"Entreprise creee: {enterprise.name} (id={enterprise.id}, plan={data['subscription_plan']}, expires={data['subscription_expires_at']})")
     try:
         email_service = EmailService(db)
         email_service.send_welcome_email(enterprise)

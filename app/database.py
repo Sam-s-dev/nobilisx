@@ -22,7 +22,7 @@ logger.info(f"🔌 URL de connexion DB résolue (voir logs config pour détails)
 if "supabase" in db_url and "sslmode" not in db_url:
     separator = "&" if "?" in db_url else "?"
     db_url = f"{db_url}{separator}sslmode=require"
-    logger.info("🔒 SSL activé pour Supabase")
+    logger.info(" SSL activé pour Supabase")
 
 # Création du moteur avec pool de connexions
 engine = create_engine(

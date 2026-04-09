@@ -2,30 +2,6 @@
 version: "3.9"
 
 services:
-  # === Application FastAPI ===
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: tender_api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://tender_user:tender_secret_password_2024@db:5432/tender_analyzer
-    env_file:
-      - .env
-    volumes:
-      - ./app:/app/app
-      - ./scripts:/app/scripts
-      - pdf_downloads:/app/downloads
-      - app_logs:/app/logs
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - tender_network
-
   # === PostgreSQL ===
   db:
     image: postgres:16-alpine
@@ -40,7 +16,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tender_user} -d ${POSTGRES_DB:-tender_analyzer}" ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tender_user} -d ${POSTGRES_DB:-tender_analyzer}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -48,13 +24,40 @@ services:
     networks:
       - tender_network
 
+  # === Application FastAPI ===
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tender_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-tender_user}:${POSTGRES_PASSWORD:-tender_secret_password_2024}@db:5432/${POSTGRES_DB:-tender_analyzer}
+      - PORT=8000
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app/app
+      - ./scripts:/app/scripts
+      - ./logs:/app/logs
+      - pdf_downloads:/app/downloads
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - tender_network
+
 volumes:
   postgres_data:
-    driver: local
   pdf_downloads:
-    driver: local
-  app_logs:
-    driver: local
 
 networks:
   tender_network:

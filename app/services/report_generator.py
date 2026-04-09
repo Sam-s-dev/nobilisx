@@ -1,16 +1,21 @@
 import os
 import re
+import base64
 import html
 import logging
+import io
 import unicodedata
 from datetime import datetime
+from reportlab.lib.utils import ImageReader
 
 from sqlalchemy.orm import Session
 
 from app.models.enterprise import Enterprise
+from app.models.individual import Individual
 from app.models.tender import Tender
 from app.models.analysis import Analysis
 from app.services.scorer import ScorerService
+from app.services.scorer_individual import IndividualScorerService
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +29,7 @@ class ReportGeneratorService:
     def __init__(self, db: Session):
         self.db = db
         self.scorer = ScorerService(db)
+        self.scorer_individual = IndividualScorerService(db)
 
     def _fix_encoding(self, text: str) -> str:
         if not text:
@@ -74,6 +80,51 @@ class ReportGeneratorService:
             analysis = self.db.query(Analysis).filter(Analysis.tender_id == item["tender_id"]).first()
             tender = self.db.query(Tender).get(item["tender_id"])
             report["top_opportunities"].append({"tender_id": item["tender_id"], "title": item["tender_title"], "score": item["score"], "score_details": item["details"], "summary": analysis.summary if analysis else None, "sector": tender.sector if tender else None, "budget": tender.estimated_budget if tender else None, "location": tender.location if tender else None, "deadline": tender.deadline.isoformat() if tender and tender.deadline else None, "source_url": tender.source_url if tender else None})
+        return report
+
+    def generate_individual_report(self, individual_id: int) -> dict:
+        """Prépare les données pour le rapport d'un particulier (Freelance)."""
+        individual = self.db.query(Individual).get(individual_id)
+        if not individual:
+            return {"error": "Particulier non trouve"}
+        
+        # Scoring spécifique freelance
+        scored = self.scorer_individual.score_all_for_individual(individual)
+        
+        report: dict = {
+            "generated_at": datetime.utcnow().isoformat(),
+            "individual": {
+                "id": individual.id,
+                "name": individual.full_name,
+                "domain": individual.domain,
+                "skills": individual.skills,
+                "exp_level": individual.experience_level,
+                "mission_type": individual.mission_type,
+                "rate": individual.desired_rate
+            },
+            "summary": {
+                "total_missions_analyzed": len(scored),
+                "high_match": len([s for s in scored if s["score"] >= 70]),
+                "medium_match": len([s for s in scored if 40 <= s["score"] < 70]),
+                "average_score": round(float(sum(s["score"] for s in scored)) / len(scored), 1) if scored else 0.0
+            },
+            "top_missions": [],
+        }
+        
+        for item in scored[:15]:
+            tender = self.db.query(Tender).get(item["tender_id"])
+            analysis = self.db.query(Analysis).filter(Analysis.tender_id == item["tender_id"]).first()
+            report["top_missions"].append({
+                "id": item["tender_id"],
+                "title": self._clean_text(item["mission_title"]),
+                "score": item["score"],
+                "explanation": item["explanation"],
+                "summary": self._clean_text(analysis.summary if analysis else ""),
+                "budget": tender.estimated_budget if tender else None,
+                "deadline": tender.deadline.isoformat() if tender and tender.deadline else None,
+                "url": tender.source_url if tender else None
+            })
+            
         return report
 
     def generate_pdf_report(self, enterprise_id: int, recommendations: list[str] | None = None, subscription_plan: str = "ENTRY") -> str | None:
@@ -147,6 +198,18 @@ class ReportGeneratorService:
             canvas.setFillColor(DARK_NAVY)
             canvas.rect(0, 0, W, H, fill=1, stroke=0)
 
+            # --- LOGO CLIENT (IF EXISTS) ---
+            if enterprise.logo_data:
+                try:
+                    # Nettoyage base64 si besoin
+                    b64 = enterprise.logo_data
+                    if "," in b64: b64 = b64.split(",")[1]
+                    img_data = base64.b64decode(b64)
+                    img_buffer = io.BytesIO(img_data)
+                    canvas.drawImage(ImageReader(img_buffer), 18*mm, H - 45*mm, width=35*mm, preserveAspectRatio=True, mask='auto')
+                except Exception as e:
+                    logger.error(f"Erreur rendu logo couverture: {e}")
+
             # Lignes decoratives
             canvas.setStrokeColor(GOLD)
             canvas.setLineWidth(0.6)
@@ -207,9 +270,19 @@ class ReportGeneratorService:
             canvas.setLineWidth(1.2)
             canvas.line(0, H - 22*mm, W, H - 22*mm)
             # Logo
-            canvas.setFillColor(NAVY)
-            canvas.setFont("Helvetica-Bold", 11)
-            canvas.drawString(18*mm, H - 14*mm, "NOBILIS X")
+            if enterprise.logo_data:
+                try:
+                    b64 = enterprise.logo_data
+                    if "," in b64: b64 = b64.split(",")[1]
+                    img_data = base64.b64decode(b64)
+                    img_header = io.BytesIO(img_data)
+                    canvas.drawImage(ImageReader(img_header), 18*mm, H - 18*mm, width=20*mm, preserveAspectRatio=True, mask='auto')
+                except Exception as e:
+                    logger.error(f"Erreur rendu logo header: {e}")
+            else:
+                canvas.setFillColor(NAVY)
+                canvas.setFont("Helvetica-Bold", 11)
+                canvas.drawString(18*mm, H - 14*mm, "NOBILIS X")
             canvas.setFillColor(MID_GRAY)
             canvas.setFont("Helvetica", 6)
             canvas.drawString(18*mm, H - 18.5*mm, "INTELLIGENCE DES MARCHES PUBLICS")

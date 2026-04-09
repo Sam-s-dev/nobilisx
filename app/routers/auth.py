@@ -4,11 +4,13 @@ Endpoints d'authentification et de validation (Trial check)
 """
 
 import logging
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.enterprise import Enterprise
 from app.models.individual import Individual
+
+from app.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +20,8 @@ router = APIRouter(
 )
 
 @router.get("/check-trial/{email}")
-def check_trial_availability(email: str, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def check_trial_availability(request: Request, email: str, db: Session = Depends(get_db)):
     """
     Vérifie si un email a déjà bénéficié d'un essai gratuit.
     Recherche dans les deux segments (Entreprises et Particuliers).
