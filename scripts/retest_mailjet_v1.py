@@ -5,7 +5,7 @@ def test_mailjet_v1():
     # Identifiants extraits exactement de votre copier-coller V1
     api_key = "97ffe0fca74582cd318dd06862fd9c86"
     api_secret = "447bffba0ab3cea380fdb268d83a2332"
-    sender = "alsenycamaraditcamaraa1seny@gmail.com"
+    sender = "generalouki21@gmail.com"
     
     print(f"🚀 Retest ULTIME des clés V1 pour {sender}...")
     

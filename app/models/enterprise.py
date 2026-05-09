@@ -5,7 +5,7 @@ Modèle Enterprise - Entreprises inscrites au système
 
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, Text, ARRAY
+    Column, Integer, String, Float, DateTime, Text, ARRAY, Boolean
 )
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -29,6 +29,12 @@ class Enterprise(Base):
     logo_data = Column(Text, nullable=True, comment="Contenu Base64 du logo")
     subscription_plan = Column(String(20), nullable=False, default="PASS", comment="Plan: PASS | ENTRY | ELITE")
     subscription_expires_at = Column(DateTime, nullable=True, comment="Date d'expiration")
+    
+    # Consentement (Mailjet Compliance)
+    consent_terms = Column(Boolean, default=False, nullable=False)
+    consent_marketing = Column(Boolean, default=False, nullable=False)
+    consent_timestamp = Column(DateTime, nullable=True)
+    
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

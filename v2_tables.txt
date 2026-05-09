@@ -1,0 +1,103 @@
+=== TABLE 1 ===
+VERSION 2.0 — DOCUMENT DE SPÉCIFICATION COMPLET
+Nouvelle architecture bi-segment : Entreprises & Particuliers Expansion internationale du scraping Stratégie anti-blocage & sources sélectionnées Plan de développement étape par étape  Date de rédaction : Avril 2026 Propriété : TrillionBerg / Luxe — Document Confidentiel
+
+=== TABLE 2 ===
+Recommandation 1 — Ouvrir aux Particuliers
+Le système ne doit pas se limiter aux entreprises. Des étudiants, freelancers, journalistes, consultants indépendants ont aussi besoin de trouver des projets sur lesquels postuler. Ce segment est large, sous-servi, et prêt à payer pour un service qui leur fait gagner du temps.
+
+=== TABLE 3 ===
+Recommandation 2 — Aller à l'International
+Le marché guinéen local est limité en volume. Les appels d'offres internationaux (ONU, Banque Mondiale, BAD, Union Européenne) et les plateformes freelance mondiales (Upwork, Malt, Freelancer.com) offrent un volume et des budgets incomparablement supérieurs. NOBILIS X doit devenir la porte d'entrée des Guinéens vers ces marchés.
+
+=== TABLE 4 ===
+Segment | ENTREPRISE | PARTICULIER
+Cible | PME, BTP, santé, IT, BTP, consultance, etc. | Freelancers, étudiants, journalistes, indépendants
+Sources scraping | Portails appels d'offres : local + international | Plateformes missions freelance : international
+Contenu du rapport | Appels d'offres avec Indice de Crédibilité 0–100 | Missions/projets avec score de compatibilité 0–100
+Fréquence d'envoi | Chaque lundi à 7h00 (Africa/Conakry) | Chaque lundi à 7h00 (Africa/Conakry)
+Format rapport | PDF premium A4 + email HTML personnalisé | Email HTML personnalisé (PDF optionnel futur)
+Tarification | Annuelle — à définir (tarif entreprise) | Annuelle — à définir (tarif particulier, plus bas)
+
+=== TABLE 5 ===
+Source | URL | Pourquoi ce choix | Fréquence scraping
+JAO Guinée | jaoguinee.com | Source principale, la plus riche, structure HTML stable, 11 catégories sectorielles | 1× par semaine (samedi soir)
+TELEMO | telemo.gov.gn | Portail officiel gouvernemental, plans de passation, structure table HTML simple | 1× par semaine (samedi soir)
+
+=== TABLE 6 ===
+Source | URL | Pourquoi ce choix | Fréquence scraping
+UNGM | ungm.org/public/notice | +14 milliards USD/an, 20 agences ONU, données publiques sans login, très structuré | 1× par semaine (samedi soir)
+UNDP Procurement | procurement.undp.org | Projets de développement Afrique de l'Ouest prioritaires, API publique disponible | 1× par semaine (samedi soir)
+
+=== TABLE 7 ===
+Source | URL | Pourquoi ce choix | Fréquence scraping
+Upwork RSS Feed | upwork.com/ab/jobs/search/rss/ | Flux RSS officiel — AUCUN blocage possible, données structurées XML, filtrable par mots-clés | 1× par semaine (samedi soir)
+Freelancer.com API | freelancer.com/api/projects/... | API publique officielle avec clé gratuite, accès légal et stable aux projets | 1× par semaine (samedi soir)
+LinkedIn Jobs | linkedin.com/jobs/search/ | Uniquement si scraping léger et avec parsing CSS ciblé. À utiliser avec prudence. | 1× par semaine (samedi soir, optionnel)
+
+=== TABLE 8 ===
+Pourquoi RSS et API plutôt que scraping HTML ?
+RSS Feeds et APIs officielles sont la meilleure solution anti-blocage possible : • Upwork propose un flux RSS public : aucun risque de blocage, données propres. • Freelancer.com a une API avec clé gratuite : accès légitime, stable, documenté. • Ce n'est PAS du scraping au sens technique — c'est de la récupération de données   via les canaux officiellement prévus par ces plateformes. • Pour LinkedIn : le scraping est plus délicat. On l'intègre avec des délais longs   et un User-Agent rotatif. Si des blocages surviennent, on le désactive.
+
+=== TABLE 9 ===
+Étape 1 | Migration du scheduler — Passage au lundi hebdomadaire Modifier le CronTrigger de APScheduler : day_of_week='mon', hour=7, minute=0. Tester l'envoi. Durée estimée : 1 jour.
+
+=== TABLE 10 ===
+Étape 2 | Nouveau modèle de données Individual Créer le modèle SQLAlchemy Individual avec tous les champs du profil particulier. Créer IndividualEmailLog. Créer la migration Alembic. Mettre à jour __init__.py des modèles. Durée estimée : 1–2 jours.
+
+=== TABLE 11 ===
+Étape 3 | Scraper anti-blocage — Sources locales optimisées Refactoriser ScraperService pour : User-Agent rotatif, délais aléatoires 3–8s, scraping uniquement le samedi soir, désactivation DGCMP par défaut, conservation uniquement JAO + TELEMO en local. Durée estimée : 2 jours.
+
+=== TABLE 12 ===
+Étape 4 | Scraper international — Sources ENTREPRISES Créer InternationalTenderScraper pour UNGM (parsing HTML public) et UNDP Procurement (parsing HTML). Intégrer dans le pipeline existant. Tester avec des faux profils d'entreprises. Durée estimée : 3–4 jours.
+
+=== TABLE 13 ===
+Étape 5 | Scraper freelance — Sources PARTICULIERS Créer FreelanceScraper avec : Upwork RSS Feed (parsing XML), Freelancer.com API (appels REST avec clé gratuite), LinkedIn Jobs (scraping HTML léger optionnel). Durée estimée : 3–4 jours.
+
+=== TABLE 14 ===
+Étape 6 | IndividualScorerService — Moteur de matching particuliers Créer IndividualScorerService avec algorithme de scoring : compétences (50%) via mots-clés, type de mission (25%), niveau/expérience (15%), langue (10%). Système d'exclusion de mots-clés. Durée estimée : 2–3 jours.
+
+=== TABLE 15 ===
+Étape 7 | Email template particulier + router API Créer le template HTML email pour particuliers (ton différent, orienté action, lien direct postulation). Créer le router FastAPI /individuals avec CRUD complet. Ajouter l'endpoint test-email pour particuliers. Durée estimée : 2 jours.
+
+=== TABLE 16 ===
+Étape 8 | Scheduler mis à jour — Intégration des deux segments Modifier job_weekly_cycle() pour traiter : entreprises (local + international) + particuliers (freelance). Ajouter gestion des plans PENDING et expirés pour les particuliers. Durée estimée : 1–2 jours.
+
+=== TABLE 17 ===
+Étape 9 | Page d'accueil frontend — Les deux portes d'entrée Créer index.html avec design NOBILIS X, deux boutons clairs (Entreprise / Particulier), liens vers les formulaires d'inscription respectifs. Intégrer dans app/static/. Durée estimée : 2 jours.
+
+=== TABLE 18 ===
+Étape 10 | Tests complets & mise en production Test de bout en bout : inscription particulier + scraping + scoring + email. Test anti-blocage : vérifier que les scrapers passent sans erreur 429. Déploiement Railway. Mise à jour documentation README. Durée estimée : 2–3 jours.
+
+=== TABLE 19 ===
+Durée totale estimée
+Développement complet V2 : 19 à 27 jours de travail Coût financier : 0 GNF (stack 100% open source + Railway hobby tier) Équipe : 1 développeur (solo possible grâce à l'architecture modulaire)  Ordre de priorité si ressources limitées : Étapes 1 → 3 → 4 → 2 → 6 → 7 → 5 → 8 → 9 → 10
+
+=== TABLE 20 ===
+Champ | Type | Description | Obligatoire
+id | Integer PK | Identifiant auto-incrémenté | Oui
+full_name | String(255) | Nom complet du particulier | Oui
+email | String(255) | Email pour recevoir les rapports | Oui
+country | String(100) | Pays de résidence | Oui
+domain | String(255) | Domaine principal (liste prédéfinie) | Oui
+skills | Text | Mots-clés compétences séparés par virgules | Oui
+experience_level | String(20) | Débutant / Intermédiaire / Expert | Oui
+experience_years | Integer | Nombre d'années d'expérience | Oui
+mission_type | String(20) | Court terme / Long terme / Les deux | Oui
+desired_rate | Float | Tarif journalier souhaité en USD (optionnel) | Non
+languages | String(50) | FR / EN / FR+EN | Oui
+portfolio_url | String(500) | Lien portfolio, LinkedIn ou GitHub | Non
+bio | Text | Courte présentation 2–4 lignes | Non
+exclude_keywords | Text | Mots-clés à exclure des projets proposés | Non
+subscription_plan | String(20) | PASS / ENTRY / ELITE (annuel) | Oui
+created_at | DateTime | Date d'inscription | Auto
+updated_at | DateTime | Dernière mise à jour | Auto
+
+=== TABLE 21 ===
+Stratégie LinkedIn dans NOBILIS X V2
+Approche : scraping léger, non agressif, en dernier recours.  • 1 seule requête par semaine, le samedi soir entre 23h et 2h du matin. • Pagination limitée : récupération uniquement des 20 premières offres par recherche. • User-Agent rotatif parmi 10 profils de vrais navigateurs. • Délai de 5 à 10 secondes entre chaque appel. • En cas d'erreur 429 ou blocage : désactivation automatique de LinkedIn pour 2 semaines,   puis nouvelle tentative. Le reste du système continue sans interruption. • Si LinkedIn reste trop instable après 3 tentatives : désactivation définitive de la source,   le système tourne uniquement sur Upwork RSS + Freelancer.com API.
+
+=== TABLE 22 ===
+NOBILIS X V2 — Résumé en une phrase
+Chaque lundi matin à 7h00, chaque entreprise et chaque particulier inscrit sur NOBILIS X reçoit dans sa boîte mail les meilleures opportunités du monde, parfaitement filtrées pour son profil, analysées par intelligence artificielle, scorées et prêtes à être saisies.
+

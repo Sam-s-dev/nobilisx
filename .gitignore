@@ -26,7 +26,8 @@ supabase_password.txt
 logs/
 downloads/
 *.log
-*.txt
+*.db
+tander.db
 
 # IDE
 .vscode/

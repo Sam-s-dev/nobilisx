@@ -597,6 +597,36 @@
 
         .price-btn-outline:hover { background: var(--violet-xsoft); }
 
+        /* ===== CHECKBOXES (Mailjet Compliance) ===== */
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-top: 15px;
+            text-align: left;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-top: 2px;
+            cursor: pointer;
+            accent-color: var(--violet-mid);
+        }
+
+        .checkbox-group label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .checkbox-group label a {
+            color: var(--violet-mid);
+            text-decoration: underline;
+        }
+
         /* ===== VALUES ===== */
         .values { padding: 100px 24px; background: var(--bg-white); }
 
@@ -1651,6 +1681,17 @@
                             placeholder="Décrivez brièvement vos équipements, certifications ou projets récents..." rows="4"></textarea>
                     </div>
 
+                    <!-- Consentement (Mailjet Compliance) -->
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="consent_terms" required>
+                        <label for="consent_terms">J'accepte les <a href="#">Conditions d'Utilisation</a> et la <a href="#">Politique de Confidentialité</a>. *</label>
+                    </div>
+
+                    <div class="checkbox-group" style="margin-bottom: 24px;">
+                        <input type="checkbox" id="consent_marketing">
+                        <label for="consent_marketing">J'accepte de recevoir les alertes quotidiennes de marchés et des informations stratégiques par email. (Optionnel)</label>
+                    </div>
+
                     <button type="submit" id="submitBtn" class="submit-btn">
                         <span id="btnText">Activer mon profil NOBILIS X</span>
                         <div id="loader" class="loader"></div>
@@ -1900,6 +1941,10 @@
             const selectedSectors = sectorChoices.getValue(true);
             const plan = document.getElementById('subscription_plan').value;
 
+            const now = new Date().toISOString();
+            const consentTerms = document.getElementById('consent_terms').checked;
+            const consentMarketing = document.getElementById('consent_marketing').checked;
+
             let payload = {};
             if (isFreelance) {
                 payload = {
@@ -1916,7 +1961,10 @@
                     desired_rate: parseFloat(document.getElementById('desired_rate').value) || 0,
                     languages: document.getElementById('languages').value,
                     subscription_plan: plan,
-                    country: "Guinée"
+                    country: "Guinée",
+                    consent_terms: consentTerms,
+                    consent_marketing: consentMarketing,
+                    consent_timestamp: now
                 };
             } else {
                 payload = {
@@ -1930,7 +1978,10 @@
                     max_budget: parseFloat(document.getElementById('max_budget').value) || 0,
                     experience_years: parseInt(document.getElementById('experience_years').value) || 0,
                     technical_capacity: document.getElementById('technical_capacity').value,
-                    subscription_plan: plan
+                    subscription_plan: plan,
+                    consent_terms: consentTerms,
+                    consent_marketing: consentMarketing,
+                    consent_timestamp: now
                 };
             }
 

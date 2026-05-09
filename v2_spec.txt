@@ -1,0 +1,189 @@
+NOBILIS X
+L'INTELLIGENCE DES MARCHÉS
+Fait en Guinée. Conçu pour que les meilleurs gagnent.
+
+
+1. Contexte & Pourquoi une Version 2
+1.1 Ce que la Version 1 a accompli
+NOBILIS X V1 est un système automatisé de veille des appels d'offres publics en Guinée. Il scrape les portails officiels guinéens (JAO Guinée, DGCMP, TELEMO), analyse les documents par IA (Groq / LLaMA 70B), calcule un Indice de Crédibilité (0–100) pour chaque opportunité, et envoie chaque lundi matin un rapport PDF premium personnalisé par email à chaque entreprise cliente.
+Ce système a été développé à 0 GNF, avec une stack entièrement open source (FastAPI, PostgreSQL, Docker, Railway). La V1 cible exclusivement les entreprises guinéennes.
+
+1.2 Les recommandations reçues — pourquoi évoluer
+Suite à des discussions avec des prospects et conseillers du terrain, deux recommandations majeures ont été formulées :
+
+
+
+1.3 La transformation stratégique
+NOBILIS X passe d'un outil de niche B2B local à une plateforme SaaS bi-segment, bi-marché. La proposition de valeur devient :
+Pour les entreprises : recevoir chaque lundi les meilleures opportunités de marchés publics de Guinée ET de l'international, parfaitement adaptées à leur profil.
+Pour les particuliers : recevoir chaque lundi les meilleures missions et projets freelance disponibles sur les grandes plateformes mondiales, filtrées selon leurs compétences.
+
+
+2. Architecture Globale de la Version 2
+2.1 Les deux segments du SaaS
+Quand un utilisateur arrive sur NOBILIS X, il voit deux portes d'entrée distinctes. Chaque segment a son propre parcours d'inscription, son propre moteur d'analyse, et son propre format de rapport. Mais ils partagent la même infrastructure technique (FastAPI, PostgreSQL, Docker, Groq, Mailjet).
+
+
+2.2 Changement de fréquence — Pourquoi le lundi
+La V1 envoyait des rapports chaque jour. La V2 passe à un envoi hebdomadaire, chaque lundi matin à 7h00. Cette décision est stratégique pour plusieurs raisons :
+Réduction de la consommation de tokens Groq (analyse IA), ce qui maintient le coût opérationnel à zéro.
+Moins de requêtes de scraping par semaine — réduit le risque de blocage par les sites sources.
+Un rapport hebdomadaire est perçu comme plus premium et plus dense. L'utilisateur a une vraie sélection, pas du bruit quotidien.
+Meilleure délivrabilité email : un email par semaine arrive rarement en spam, un email par jour beaucoup plus facilement.
+
+
+3. Stratégie Anti-Blocage du Scraping
+C'est le point le plus critique de toute la V2. Un système qui se bloque en scrapant ne vaut rien. Voici la stratégie complète mise en place pour que NOBILIS X ne soit jamais bloqué.
+
+3.1 Le problème du blocage
+Les sites web bloquent les scrapers qui font trop de requêtes, trop vite, avec le même profil. Les signaux détectés sont : fréquence trop élevée des requêtes, pas de délai entre les appels, même adresse IP en boucle, User-Agent identifié comme bot, absence de cookies et headers de navigateur.
+
+3.2 Sources sélectionnées — peu mais fiables
+La règle fondamentale : moins de sources, mais mieux choisies. On ne scrape pas 20 sites — on scrape 2 à 3 sources par segment, soigneusement sélectionnées pour leur fiabilité, leur accessibilité technique et la qualité de leurs données.
+
+Sources ENTREPRISES — Guinée (local)
+
+Note : DGCMP est conservé en code mais désactivé par défaut (site souvent indisponible). Il peut être réactivé manuellement.
+
+Sources ENTREPRISES — International
+
+Note : Banque Mondiale, BAD et TED Europa sont identifiés pour une intégration future (V2.1). Ils nécessitent une analyse technique plus approfondie de leur structure.
+
+Sources PARTICULIERS — International
+
+
+3.3 Les règles techniques anti-blocage appliquées
+Ces règles sont déjà partiellement en place dans la V1. La V2 les renforce et les standardise :
+Délai aléatoire entre chaque requête : entre 3 et 8 secondes (pas de pattern détectable).
+User-Agent rotatif : liste de 10 User-Agents de vrais navigateurs (Chrome, Firefox, Safari), changé à chaque session.
+Respect du robots.txt : vérification systématique avant d'ajouter une nouvelle source.
+Scraping uniquement le week-end : un seul passage par semaine, le samedi soir entre 22h et 2h du matin — période de faible trafic sur les sites sources.
+Retry avec backoff exponentiel : déjà en place via tenacity. En cas d'erreur 429 (rate limit), pause automatique de 30 minutes avant nouvelle tentative.
+Cache local des URLs déjà scrapées : un tender/projet déjà en base n'est jamais re-téléchargé.
+Pas de téléchargement massif de PDF : on extrait uniquement le texte visible de la page HTML. Les PDFs ne sont téléchargés que si la page ne contient pas assez d'informations.
+
+
+4. Fonctionnalités Complètes de la Version 2
+4.1 Page d'accueil — Les deux portes d'entrée
+La première chose visible sur NOBILIS X est un choix simple et clair :
+Bouton 1 : « Je suis une Entreprise » — redirige vers le formulaire d'inscription entreprise.
+Bouton 2 : « Je suis un Particulier » — redirige vers le formulaire d'inscription particulier.
+Les deux parcours sont indépendants. Un utilisateur ne peut pas se tromper de formulaire.
+
+4.2 Fonctionnalités — Segment ENTREPRISE
+Inscription & Profil
+Formulaire complet : nom entreprise, secteur(s), fourchette budgétaire (GNF), zones géographiques, années d'expérience, capacités techniques, email, mots-clés inclus/exclus, logo.
+Choix du plan d'abonnement annuel (PASS gratuit 2 jours, ENTRY, ELITE).
+Email de bienvenue automatique avec instructions de paiement si plan payant.
+Statut PENDING jusqu'à confirmation manuelle du paiement Orange Money.
+
+Scraping & Analyse
+Collecte hebdomadaire (samedi soir) sur : JAO Guinée, TELEMO (local) + UNGM, UNDP (international).
+Filtrage intelligent : seules les catégories correspondant aux secteurs des entreprises inscrites sont scrapées.
+Analyse IA via Groq LLaMA 70B : résumé 200 mots + extraction structurée (secteur, budget, localisation, deadline).
+Indice de Crédibilité 0–100 calculé selon : secteur 35%, budget 30%, zone géographique 20%, expérience 15%.
+Système de mots-clés bonus (+30% max) et mots-clés exclusion (score forcé à 0).
+
+Rapport hebdomadaire
+Envoi chaque lundi à 7h00 (Africa/Conakry).
+Email HTML premium avec top 10 opportunités, score coloré, lien direct vers l'offre.
+Rapport PDF A4 premium joint en pièce jointe (couverture, sommaire exécutif, profil entreprise, top 10 avec détails, recommandations IA).
+Recommandations personnalisées par IA adaptées au plan : 2 recommandations courtes (ENTRY), 5 recommandations stratégiques détaillées (ELITE).
+Alertes temps réel exclusives ELITE : si un nouveau tender score ≥ 70, alerte immédiate sans attendre lundi.
+
+4.3 Fonctionnalités — Segment PARTICULIER
+Inscription & Profil
+Formulaire dédié : nom complet, email, pays de résidence.
+Domaine principal : Développement web/mobile, Design, Rédaction/Journalisme, Marketing digital, Traduction, Comptabilité/Finance, Consulting, Autre.
+Compétences spécifiques : champ libre avec mots-clés (ex : React, Python, Figma, SEO, WordPress).
+Niveau d'expérience : Débutant, Intermédiaire, Expert.
+Années d'expérience dans le domaine.
+Type de missions souhaité : Court terme, Long terme, Les deux.
+Tarif souhaité : optionnel, utilisé comme filtre sur les projets trop bas ou trop élevés.
+Langues de travail : Français, Anglais, Les deux.
+Lien portfolio ou LinkedIn : optionnel mais améliore significativement la qualité du matching.
+Bio courte : 2 à 4 lignes utilisées par l'IA pour contextualiser le rapport.
+Mots-clés à exclure : pour filtrer des types de missions non souhaités.
+
+Scraping & Analyse
+Collecte hebdomadaire (samedi soir) sur : Upwork (RSS), Freelancer.com (API officielle), LinkedIn Jobs (optionnel, scraping léger).
+Filtrage par langue française en priorité pour ne pas surcharger le système. L'anglais peut être activé si l'utilisateur coche la case.
+Analyse IA via Groq LLaMA 70B : résumé du projet + extraction structurée (type de mission, compétences requises, budget client, durée estimée).
+Score de compatibilité 0–100 calculé selon : compétences 50%, type de mission 25%, niveau/expérience 15%, langue 10%.
+Exclusion automatique des projets dont les mots-clés sont dans la liste d'exclusion.
+
+Rapport hebdomadaire
+Envoi chaque lundi à 7h00 (Africa/Conakry), même créneau que les entreprises.
+Email HTML personnalisé avec top 10 missions de la semaine, score de compatibilité, résumé du projet client, lien direct pour postuler.
+Ton adapté : plus direct, plus jeune que le rapport entreprise. Orienté action : « Postule maintenant ».
+Recommandations IA courtes : 2 conseils personnalisés pour améliorer son profil ou mieux postuler.
+
+4.4 Fonctionnalités communes
+Tarification annuelle pour les deux segments (montants à définir ultérieurement).
+Paiement par Orange Money (+224 627 27 13 97) — seul canal de paiement local disponible.
+Dashboard admin : accès à la liste des inscrits, statuts de paiement, historique des envois.
+Endpoint de test : POST /analysis/test-email/{id} permet de déclencher un cycle complet instantané pour démonstration client.
+Health check et monitoring du scheduler accessible via /health et /scheduler/status.
+
+
+5. Plan de Développement — Étape par Étape
+Chaque étape est conçue pour être développée et livrée indépendamment, sans bloquer les autres. Coût total : 0 GNF (stack 100% open source, hébergement Railway gratuit en tier hobby).
+
+
+
+
+
+
+
+
+
+
+
+
+
+6. Nouveau Modèle de Données — Individual
+Le modèle Individual est le miroir du modèle Enterprise, adapté aux besoins des particuliers. Il est indépendant et n'interfère pas avec le système existant.
+
+
+
+7. LinkedIn — Intégration et Précautions
+7.1 Pourquoi LinkedIn est intéressant
+LinkedIn Jobs est la plateforme la plus riche en offres d'emploi et missions freelance francophones et africaines. Elle publie des offres pour toutes les catégories de particuliers : développeurs, designers, consultants, rédacteurs, journalistes.
+7.2 La contrainte technique réelle
+LinkedIn bloque activement le scraping non autorisé. Les mesures anti-bot incluent : détection de User-Agent, rate limiting agressif, CAPTCHAs, et dans les cas extrêmes, blocage d'IP. Il ne faut pas en faire une source principale.
+
+
+
+8. Tarification — Principes (Montants à Définir)
+Les montants exacts des abonnements seront définis une fois le développement terminé et les premiers tests clients effectués. Voici les principes arrêtés.
+
+Facturation annuelle pour les deux segments (plus de mensuel). Avantage : engagement client plus long, trésorerie plus stable.
+Tarif particulier inférieur au tarif entreprise. Un étudiant ou freelancer ne peut pas payer le même prix qu'une PME.
+Plan PASS (essai gratuit 2 jours) conservé pour les deux segments. C'est le meilleur outil de conversion.
+Paiement exclusivement par Orange Money au numéro +224 627 27 13 97. Activation manuelle après confirmation de réception.
+Plans PENDING_ENTRY et PENDING_ELITE : l'utilisateur est inscrit mais bloqué jusqu'au paiement. Le rapport de test (PASS) lui est envoyé pour lui donner envie de payer.
+
+
+9. Ce qui ne Change Pas dans la V2
+Pour éviter toute régression, les éléments suivants de la V1 sont maintenus exactement tels quels dans la V2 :
+Stack technique : FastAPI, PostgreSQL, SQLAlchemy, Docker, Railway, Groq, Mailjet.
+Tous les modèles existants : Enterprise, Tender, Analysis, EmailLog, Subscription.
+Le ScraperService existant (JAO + TELEMO) est refactorisé mais pas réécrit.
+L'AIAnalyzerService et sa logique de retry (tenacity) sont conservés intégralement.
+Le ScorerService entreprise (secteur 35%, budget 30%, zone 20%, expérience 15%) est inchangé.
+Le ReportGeneratorService (PDF ReportLab A4 premium) est conservé pour les entreprises.
+L'EmailService (Mailjet API REST port 443) est conservé et étendu pour les particuliers.
+Les endpoints API existants /enterprises, /tenders, /analysis restent identiques et compatibles.
+Le coût de développement : 0 GNF. La V2 est développée avec les mêmes outils gratuits.
+
+
+10. Conclusion
+NOBILIS X V2 transforme un outil de niche en une plateforme SaaS complète, bi-segment, bi-marché. En ajoutant le volet Particuliers et l'expansion internationale, le produit multiplie sa cible adressable par 5 à 10 tout en maintenant un coût opérationnel à zéro.
+
+La stratégie anti-blocage garantit la fiabilité du système sur le long terme. En choisissant des flux RSS et des APIs officielles là où c'est possible, et en limitant le scraping HTML à 2 sources locales fiables, NOBILIS X ne risque pas de se retrouver bloqué.
+
+Le plan de développement en 10 étapes permet une livraison progressive et testable. Chaque étape est indépendante — si une source pose problème, le reste du système continue de fonctionner sans interruption.
+
+
+NOBILIS X  —  Fait en Guinée. Conçu pour que les meilleurs gagnent.
+TrillionBerg / Luxe  |  trillionnx@gmail.com  |  +224 627 27 13 97

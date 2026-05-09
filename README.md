@@ -1,4 +1,4 @@
-# Tender Analyzer MVP
+# Nobilis X
 
 Solution automatisée de collecte, analyse et distribution d'appels d'offres en Guinée.
 

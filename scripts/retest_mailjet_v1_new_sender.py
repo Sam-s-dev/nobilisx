@@ -6,7 +6,7 @@ def test():
     api_secret = "447bffba0ab3cea380fdb268d83a2332"
     sender = "sivoryprince@gmail.com" # Nouvel expéditeur demandé
     
-    print(f"🚀 Test avec {sender}...")
+    print(f"Test with {sender}...")
     url = "https://api.mailjet.com/v3.1/send"
     
     payload = {

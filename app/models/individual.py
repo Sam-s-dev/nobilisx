@@ -3,7 +3,7 @@
 Modèle SQLAlchemy pour les particuliers (Segment Particuliers V2)
 """
 
-from sqlalchemy import Column, Integer, String, Float, Text, DateTime
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -59,6 +59,11 @@ class Individual(Base):
     logo_data = Column(Text, nullable=True, comment="Contenu Base64 du logo")
     subscription_plan = Column(String(20), default="PASS", nullable=False)
     subscription_expires_at = Column(DateTime, nullable=True, comment="Date d'expiration")
+    
+    # Consentement (Mailjet Compliance)
+    consent_terms = Column(Boolean, default=False, nullable=False)
+    consent_marketing = Column(Boolean, default=False, nullable=False)
+    consent_timestamp = Column(DateTime, nullable=True)
     
     # 16. created_at
     created_at = Column(DateTime, default=datetime.utcnow)

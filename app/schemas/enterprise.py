@@ -23,6 +23,11 @@ class EnterpriseBase(BaseModel):
     logo_data: str | None = Field(None, description="Contenu Base64 du logo")
     subscription_plan: str = Field("PASS", description="Plan d'abonnement: PASS, ENTRY ou ELITE")
     subscription_expires_at: datetime | None = Field(None, description="Date d'expiration")
+    
+    # Consentement (Mailjet Compliance)
+    consent_terms: bool = Field(False, description="Acceptation des CGU")
+    consent_marketing: bool = Field(False, description="Consentement marketing")
+    consent_timestamp: datetime | None = Field(None, description="Horodatage du consentement")
 
     @field_validator("max_budget")
     @classmethod

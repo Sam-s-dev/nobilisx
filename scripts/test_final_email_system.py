@@ -11,7 +11,7 @@ def test():
     db = SessionLocal()
     try:
         # 1. On cherche ou on crée une entreprise de test avec l'email vérifié
-        email_ok = "alsenycamaraditcamaraa1seny@gmail.com"
+        email_ok = "generalouki21@gmail.com"
         enterprise = db.query(Enterprise).filter(Enterprise.email == email_ok).first()
         
         if not enterprise:

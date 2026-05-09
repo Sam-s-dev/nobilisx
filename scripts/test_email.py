@@ -4,11 +4,12 @@ import os
 sys.path.append(os.getcwd())
 
 from app.services.email_service import EmailService
+from app.config import get_settings
 
 def test():
     print("📧 Envoi d'un email de test via Mailjet...")
-    # On utilise un email de destination valide pour le test (le vôtre)
-    recipient = "alsenycamaraditcamaraa1seny@gmail.com"
+    settings = get_settings()
+    recipient = settings.SMTP_FROM  # On s'envoie le mail à soi-même pour tester
     subject = "Nobilis X V2 - Test de Connexion"
     body = "Félicitations ! Votre configuration Mailjet pour Nobilis X V2 est opérationnelle."
     
