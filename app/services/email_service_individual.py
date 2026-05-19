@@ -20,6 +20,11 @@ import urllib.parse
 from datetime import datetime, timedelta
 
 import requests
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from tenacity import retry, stop_after_attempt, wait_exponential
 from sqlalchemy.orm import Session
 
@@ -213,8 +218,9 @@ class IndividualEmailService:
   <!-- HEADER -->
   <tr><td style="background:linear-gradient(160deg,#1e1b4b 0%,#312e81 55%,#3730a3 100%);border-radius:20px 20px 0 0;padding:36px 30px 32px 30px;text-align:center;">
     <h1 style="margin:0 0 6px 0;font-size:30px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">NOBILIS X</h1>
-    <p style="margin:0 0 4px 0;font-size:12px;color:#a78bfa;font-weight:600;font-family:-apple-system,sans-serif;letter-spacing:1.5px;text-transform:uppercase;">Missions Freelance</p>
+    <p style="margin:0 0 4px 0;font-size:12px;color:#a78bfa;font-weight:600;font-family:-apple-system,sans-serif;letter-spacing:1.5px;text-transform:uppercase;">Missions 100% en Ligne (Télétravail)</p>
     <p style="margin:0;font-size:13px;color:#94a3b8;font-weight:400;font-family:-apple-system,sans-serif;">Rapport Hebdomadaire &bull; {date_str}</p>
+
   </td></tr>
 
   <!-- BODY -->
@@ -260,14 +266,56 @@ class IndividualEmailService:
     #  Envoi via API HTTP Mailjet (Port 443)
     # ------------------------------------------------------------------
 
+    def _send_smtp_standard(self, to_email: str, subject: str, html_body: str) -> bool:
+        """Envoie un email via SMTP standard (Gmail, Hostinger, Mailjet SMTP, etc.)"""
+        logger.info(f"📨 Tentative SMTP standard (Individual) ({settings.SMTP_HOST}:{settings.SMTP_PORT}) -> {to_email}")
+        try:
+            # Création du message
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = self._clean_subject(subject)
+            msg["From"] = f"NOBILIS X <{settings.SMTP_FROM}>"
+            msg["To"] = to_email
+            
+            # Corps alternatif
+            plain_text = self._clean_plain_text(getattr(self, '_text_summary', '') or subject)
+            text_part = MIMEText(f"Salut,\n\nVoici tes missions de la semaine sur NOBILIS X.\n\n{plain_text}", "plain", "utf-8")
+            html_part = MIMEText(html_body, "html", "utf-8")
+            
+            msg.attach(text_part)
+            msg.attach(html_part)
+                
+            # Détermination du mode de connexion (SSL vs STARTTLS)
+            if settings.SMTP_PORT == 465:
+                server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30)
+            else:
+                server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30)
+                if settings.SMTP_TLS:
+                    server.starttls()
+                    
+            if settings.SMTP_USER and settings.SMTP_PASSWORD:
+                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                
+            server.sendmail(settings.SMTP_FROM, to_email, msg.as_string())
+            server.quit()
+            logger.info(f"✅ Email envoyé via SMTP standard (Individual) à {to_email}")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Échec envoi via SMTP standard (Individual): {e}")
+            raise
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=2, min=5, max=30),
     )
     def _send_mailjet_http(self, to_email: str, subject: str, html_body: str) -> bool:
-        """Envoie un email via l'API REST Mailjet v3.1 (Port 443)."""
-        logger.info(f"📨 Envoi Mailjet (Individual) -> {to_email}")
+        """Envoie un email. Route intelligemment entre l'API REST Mailjet et le SMTP standard selon la configuration."""
+        # Si l'hôte SMTP n'est pas Mailjet, utiliser le SMTP standard directement
+        if settings.SMTP_HOST != "in-v3.mailjet.com":
+            logger.info("Configuration SMTP non-Mailjet détectée. Utilisation du SMTP standard pour particulier...")
+            return self._send_smtp_standard(to_email, subject, html_body)
 
+        # Si c'est Mailjet, tenter l'API REST d'abord
+        logger.info(f"📨 Envoi Mailjet API (Individual) -> {to_email}")
         api_url = "https://api.mailjet.com/v3.1/send"
         auth = (settings.SMTP_USER, settings.SMTP_PASSWORD)
 
@@ -298,14 +346,13 @@ class IndividualEmailService:
             response.raise_for_status()
             logger.info(f"✅ Email envoyé (Individual) à {to_email}")
             return True
-        except requests.exceptions.HTTPError as e:
-            logger.error(f"❌ Echec HTTP Mailjet (Individual): {e}")
-            if e.response is not None:
-                logger.error(f"Response Mailjet: {e.response.text}")
-            raise
         except Exception as e:
-            logger.error(f"❌ Echec envoi Mailjet (Individual): {e}")
-            raise
+            logger.warning(f"⚠️ Échec API Mailjet REST (Individual) ({e}). Fallback vers Mailjet SMTP standard...")
+            try:
+                return self._send_smtp_standard(to_email, subject, html_body)
+            except Exception as smtp_err:
+                logger.error(f"❌ Échec ultime de l'envoi SMTP (Individual) : {smtp_err}")
+                raise e
 
     # ------------------------------------------------------------------
     #  Email de bienvenue — Particulier
@@ -338,7 +385,7 @@ class IndividualEmailService:
         else:
             message_body = f"""
     <p style="color:#e2e8f0;line-height:1.7;font-size:14px;"><strong>C'est bon, ton paiement a été validé ! Ton compte NOBILIS {plan_base} est maintenant 100% actif.</strong></p>
-    <p style="color:#e2e8f0;line-height:1.7;font-size:14px;">Chaque <strong>lundi à 7h</strong>, tu recevras par mail tes meilleures missions de freelance en <strong style="color:#fff;">{clean_domain}</strong> avec un score de compatibilité personnalisé.</p>
+    <p style="color:#e2e8f0;line-height:1.7;font-size:14px;">Chaque <strong>lundi à 7h</strong>, tu recevras par mail tes meilleures missions 100% en ligne (télétravail) en <strong style="color:#fff;">{clean_domain}</strong> avec un score de compatibilité personnalisé.</p>
     <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);padding:14px 18px;border-radius:10px;margin:16px 0;">
         <p style="color:#c4b5fd;font-size:13px;margin:0;line-height:1.5;">💡 <strong>Astuce :</strong> Surveille bien ta boîte mail lundi matin à 7h00 précise !</p>
     </div>
@@ -348,7 +395,7 @@ class IndividualEmailService:
 <html lang="fr"><body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;background:#0f0b2e;color:#fff;">
     <div style="max-width:500px;margin:0 auto;background:#1e1b4b;padding:40px;border-radius:20px;border:1px solid #312e81;">
     <h1 style="color:#a78bfa;font-size:26px;margin:0 0 4px 0;font-weight:900;">NOBILIS X</h1>
-    <p style="color:#6366f1;font-size:11px;margin:0 0 24px 0;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;">Missions Freelance</p>
+    <p style="color:#6366f1;font-size:11px;margin:0 0 24px 0;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;">Missions 100% en Ligne</p>
     <h2 style="color:#fff;font-size:20px;font-weight:800;">Salut {clean_name} !</h2>
     {message_body}
     <hr style="border:1px solid #312e81;margin:24px 0;">

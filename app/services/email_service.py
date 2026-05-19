@@ -14,6 +14,11 @@ import unicodedata
 from datetime import datetime
 
 import requests
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from tenacity import retry, stop_after_attempt, wait_exponential
 from sqlalchemy.orm import Session
 
@@ -234,14 +239,77 @@ class EmailService:
     #  Envoi via API HTTP Mailjet (Port 443)
     # ------------------------------------------------------------------
 
+    def _send_smtp_standard(self, to_email: str, subject: str, html_body: str, pdf_path: str | None = None) -> bool:
+        """Envoie un email via SMTP standard (Gmail, Hostinger, Mailjet SMTP, etc.)"""
+        logger.info(f"Tentative SMTP standard ({settings.SMTP_HOST}:{settings.SMTP_PORT}) -> {to_email}")
+        try:
+            # Création du message
+            msg = MIMEMultipart("alternative") if not pdf_path else MIMEMultipart("mixed")
+            msg["Subject"] = self._clean_subject(subject)
+            msg["From"] = f"NOBILIS X <{settings.SMTP_FROM}>"
+            msg["To"] = to_email
+            
+            # Corps alternatif
+            plain_text = self._clean_plain_text(getattr(self, '_text_summary', '') or subject)
+            text_part = MIMEText(f"Bonjour,\n\nVoici votre rapport NOBILIS X.\n\n{plain_text}", "plain", "utf-8")
+            html_part = MIMEText(html_body, "html", "utf-8")
+            
+            if pdf_path:
+                msg_alternative = MIMEMultipart("alternative")
+                msg_alternative.attach(text_part)
+                msg_alternative.attach(html_part)
+                msg.attach(msg_alternative)
+                
+                # Pièce jointe PDF
+                if os.path.exists(pdf_path):
+                    try:
+                        with open(pdf_path, "rb") as f:
+                            part = MIMEBase("application", "octet-stream")
+                            part.set_payload(f.read())
+                        encoders.encode_base64(part)
+                        part.add_header(
+                            "Content-Disposition",
+                            f"attachment; filename={os.path.basename(pdf_path)}",
+                        )
+                        msg.attach(part)
+                    except Exception as e:
+                        logger.error(f"Erreur préparation pièce jointe PDF SMTP : {e}")
+            else:
+                msg.attach(text_part)
+                msg.attach(html_part)
+                
+            # Détermination du mode de connexion (SSL vs STARTTLS)
+            if settings.SMTP_PORT == 465:
+                server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30)
+            else:
+                server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30)
+                if settings.SMTP_TLS:
+                    server.starttls()
+                    
+            if settings.SMTP_USER and settings.SMTP_PASSWORD:
+                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                
+            server.sendmail(settings.SMTP_FROM, to_email, msg.as_string())
+            server.quit()
+            logger.info(f"✅ Email envoyé via SMTP standard à {to_email}")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Échec envoi via SMTP standard: {e}")
+            raise
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=2, min=5, max=30),
     )
     def _send_mailjet_http(self, to_email: str, subject: str, html_body: str, pdf_path: str | None = None) -> bool:
-        """Envoie un email via l'API REST Mailjet v3.1 (Port 443)."""
-        logger.info(f"Tentative API Mailjet -> {to_email}")
+        """Envoie un email. Route intelligemment entre l'API REST Mailjet et le SMTP standard selon la configuration."""
+        # Si l'hôte SMTP n'est pas Mailjet, utiliser le SMTP standard directement
+        if settings.SMTP_HOST != "in-v3.mailjet.com":
+            logger.info("Configuration SMTP non-Mailjet détectée. Utilisation du SMTP standard...")
+            return self._send_smtp_standard(to_email, subject, html_body, pdf_path)
 
+        # Si c'est Mailjet, tenter l'API REST d'abord
+        logger.info(f"Tentative API Mailjet -> {to_email}")
         api_url = "https://api.mailjet.com/v3.1/send"
         auth = (settings.SMTP_USER, settings.SMTP_PASSWORD)
         
@@ -288,14 +356,13 @@ class EmailService:
             response.raise_for_status()
             logger.info(f"Email envoye via API Mailjet a {to_email}")
             return True
-        except requests.exceptions.HTTPError as e:
-            logger.error(f"Echec HTTP Mailjet: {e}")
-            if e.response is not None:
-                logger.error(f"Response Mailjet: {e.response.text}")
-            raise
         except Exception as e:
-            logger.error(f"Echec envoi API Mailjet: {e}")
-            raise
+            logger.warning(f"⚠️ Échec API Mailjet REST ({e}). Fallback vers Mailjet SMTP standard...")
+            try:
+                return self._send_smtp_standard(to_email, subject, html_body, pdf_path)
+            except Exception as smtp_err:
+                logger.error(f"❌ Échec ultime de l'envoi SMTP de secours : {smtp_err}")
+                raise e
 
     # ------------------------------------------------------------------
     #  Rapport quotidien

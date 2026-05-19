@@ -6,6 +6,8 @@
     <title>NOBILIS X | Administration</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for premium statistics visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         :root {
@@ -270,9 +272,140 @@
         .stat-value.warning { color: var(--warning); }
         .stat-value.success { color: var(--success); }
 
+        /* === PREMIUM CHARTS GRID === */
+        .dashboard-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 28px;
+        }
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 24px;
+            backdrop-filter: blur(10px);
+            transition: var(--transition);
+            min-height: 350px;
+            display: flex;
+            flex-direction: column;
+            animation: cardAppear 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        .chart-card:nth-child(1) { animation-delay: 0.15s; }
+        .chart-card:nth-child(2) { animation-delay: 0.25s; }
+        .chart-card:nth-child(3) { animation-delay: 0.35s; }
+        .chart-card:nth-child(4) { animation-delay: 0.45s; }
+        .chart-card:hover {
+            border-color: var(--border-hover);
+            box-shadow: var(--shadow-violet);
+            transform: translateY(-2px);
+        }
+        .chart-card h3 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: 0.5px;
+        }
+        .chart-card h3 i {
+            color: var(--violet-light);
+        }
+        .chart-container {
+            position: relative;
+            flex-grow: 1;
+            height: 240px;
+            width: 100%;
+        }
+
+        /* === OPERATIONS & MAINTENANCE PANEL === */
+        .ops-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 24px 28px;
+            margin-bottom: 28px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            animation: cardAppear 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: var(--transition);
+        }
+        .ops-panel:hover {
+            border-color: var(--border-hover);
+            box-shadow: var(--shadow-violet);
+        }
+        .ops-info {
+            flex: 1;
+            min-width: 280px;
+        }
+        .ops-info h3 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .ops-info h3 i { color: var(--violet-light); }
+        .ops-info p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+        .ops-actions {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .btn-ops {
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Outfit', sans-serif;
+        }
+        .btn-ops.scrape {
+            background: linear-gradient(135deg, var(--violet-mid), var(--violet-deep));
+            color: white;
+            box-shadow: 0 4px 16px rgba(124, 58, 237, 0.2);
+        }
+        .btn-ops.reports {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.2);
+        }
+        .btn-ops:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.15);
+        }
+        .btn-ops:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            filter: none;
+        }
+
         /* === TABS === */
         .tabs-wrap {
-            display: flex; align-items: center; justify-content: space-between;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             margin-bottom: 20px;
         }
         .tabs { display: flex; gap: 6px; }
@@ -304,6 +437,7 @@
             backdrop-filter: blur(10px);
             animation: cardAppear 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
             transform: translateY(20px); opacity: 0;
+            margin-bottom: 40px;
         }
         .section-header { 
             padding: 20px 28px; border-bottom: 1px solid var(--border); 
@@ -394,8 +528,14 @@
         }
 
         /* === RESPONSIVE === */
+        @media (max-width: 992px) {
+            .dashboard-row { grid-template-columns: repeat(2, 1fr); }
+        }
         @media (max-width: 768px) {
             .stats-row { grid-template-columns: 1fr 1fr; }
+            .dashboard-row { grid-template-columns: 1fr; }
+            .ops-panel { flex-direction: column; text-align: center; }
+            .ops-actions { justify-content: center; }
             .tabs-wrap { flex-direction: column; gap: 12px; align-items: flex-start; }
             header { flex-direction: column; gap: 16px; text-align: center; }
             .header-right { justify-content: center; }
@@ -430,7 +570,7 @@
                 <i class="fas fa-arrow-right-to-bracket"></i> Se Connecter
             </button>
             <div id="loginError">
-                <i class="fas fa-circle-exclamation"></i> Mot de passe incorrect — Veuillez réessayer.
+                <i class="fas fa-circle-exclamation"></i> Code d'accès incorrect — Veuillez réessayer.
             </div>
         </div>
     </div>
@@ -444,7 +584,7 @@
                 </div>
                 <div>
                     <div class="header-brand">NOBILIS <span>X</span></div>
-                    <div class="header-sub">Panneau d'Administration</div>
+                    <div class="header-sub">Panneau d'Administration Pro</div>
                 </div>
             </div>
             <div class="header-right">
@@ -457,6 +597,7 @@
             </div>
         </header>
 
+        <!-- Stats Counter -->
         <div class="stats-row">
             <div class="stat-card">
                 <div class="stat-icon violet"><i class="fas fa-users"></i></div>
@@ -480,6 +621,55 @@
             </div>
         </div>
 
+        <!-- Section 1 : Premium Visual Analytics (4 charts) -->
+        <div class="dashboard-row">
+            <!-- Chart 1: Evolution Temporelle -->
+            <div class="chart-card">
+                <h3><i class="fas fa-chart-line"></i> Évolution des Inscriptions</h3>
+                <div class="chart-container">
+                    <canvas id="chartGrowth"></canvas>
+                </div>
+            </div>
+            <!-- Chart 2: Répartition des Segments -->
+            <div class="chart-card">
+                <h3><i class="fas fa-chart-pie"></i> Segments d'Utilisateurs</h3>
+                <div class="chart-container">
+                    <canvas id="chartSegments"></canvas>
+                </div>
+            </div>
+            <!-- Chart 3: Types d'Abonnement -->
+            <div class="chart-card">
+                <h3><i class="fas fa-chart-bar"></i> Plans d'Abonnement</h3>
+                <div class="chart-container">
+                    <canvas id="chartPlans"></canvas>
+                </div>
+            </div>
+            <!-- Chart 4: Statut des Comptes -->
+            <div class="chart-card">
+                <h3><i class="fas fa-chart-doughnut"></i> États des Comptes</h3>
+                <div class="chart-container">
+                    <canvas id="chartStatuses"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2 : Panneau d'Actions Système & Maintenance -->
+        <div class="ops-panel">
+            <div class="ops-info">
+                <h3><i class="fas fa-gears"></i> Contrôle & Maintenance Système</h3>
+                <p>Déclenchez manuellement les processus automatisés du scheduler pour synchroniser la plateforme en temps réel.</p>
+            </div>
+            <div class="ops-actions">
+                <button class="btn-ops scrape" id="btnTriggerScrape" onclick="triggerScrape()">
+                    <i class="fas fa-cloud-arrow-down"></i> Lancer la Collecte (Scrape)
+                </button>
+                <button class="btn-ops reports" id="btnTriggerReports" onclick="triggerWeeklyReports()">
+                    <i class="fas fa-paper-plane"></i> Lancer le Cycle IA / Rapports
+                </button>
+            </div>
+        </div>
+
+        <!-- Section 3 : Users List & Search -->
         <div class="tabs-wrap">
             <nav class="tabs">
                 <button class="tab-btn active" onclick="setTab('all', this)"><i class="fas fa-layer-group"></i> Tous</button>
@@ -525,6 +715,12 @@
         let adminPass = localStorage.getItem('nobilis_admin_pass');
         let allUsers = [];
         let currentTab = 'all';
+        
+        // ChartJS instances
+        let chartGrowthInst = null;
+        let chartSegmentsInst = null;
+        let chartPlansInst = null;
+        let chartStatusesInst = null;
 
         if (adminPass) {
             document.getElementById('loginOverlay').style.display = 'none';
@@ -571,6 +767,7 @@
                 allUsers = await res.json();
                 updateStats();
                 applyFilter();
+                renderCharts();
                 document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
             } catch (e) {
                 console.error(e);
@@ -679,6 +876,216 @@
             });
         }
 
+        /* === DYNAMIC REAL-TIME PREMIUM CHARTS === */
+        function renderCharts() {
+            if (allUsers.length === 0) return;
+
+            // 1. DATASET 1: Evolution Temporelle (Growth Line Chart)
+            const growthData = {};
+            allUsers.forEach(u => {
+                if (u.created_at) {
+                    const d = u.created_at.substring(0, 10);
+                    growthData[d] = (growthData[d] || 0) + 1;
+                }
+            });
+            const sortedDates = Object.keys(growthData).sort();
+            let accum = 0;
+            const growthCumulative = sortedDates.map(date => {
+                accum += growthData[date];
+                return accum;
+            });
+
+            // 2. DATASET 2: Répartition Segments (Entreprises vs Particuliers)
+            const ents = allUsers.filter(u => u.type === 'enterprise').length;
+            const inds = allUsers.filter(u => u.type === 'individual').length;
+
+            // 3. DATASET 3: Plans d'Abonnement
+            const plans = { PASS: 0, ENTRY: 0, ELITE: 0 };
+            allUsers.forEach(u => {
+                const p = (u.plan || 'PASS').toUpperCase();
+                plans[p] = (plans[p] || 0) + 1;
+            });
+
+            // 4. DATASET 4: Statuts des comptes
+            const active = allUsers.filter(u => u.status === 'active').length;
+            const pending = allUsers.filter(u => u.status === 'pending').length;
+            const suspended = allUsers.filter(u => u.status === 'suspended').length;
+
+            // Chart global styling options
+            const fontOpts = { family: "'Outfit', sans-serif", color: '#c4b5fd' };
+
+            // Destroy existing charts to prevent hover glitch
+            if (chartGrowthInst) chartGrowthInst.destroy();
+            if (chartSegmentsInst) chartSegmentsInst.destroy();
+            if (chartPlansInst) chartPlansInst.destroy();
+            if (chartStatusesInst) chartStatusesInst.destroy();
+
+            // CHART 1: Evolution Temporelle
+            const ctxGrowth = document.getElementById('chartGrowth').getContext('2d');
+            const gradientGrowth = ctxGrowth.createLinearGradient(0, 0, 0, 200);
+            gradientGrowth.addColorStop(0, 'rgba(124, 58, 237, 0.4)');
+            gradientGrowth.addColorStop(1, 'rgba(124, 58, 237, 0.0)');
+            
+            chartGrowthInst = new Chart(ctxGrowth, {
+                type: 'line',
+                data: {
+                    labels: sortedDates.map(d => new Date(d).toLocaleDateString('fr-FR', {month: 'short', day: 'numeric'})),
+                    datasets: [{
+                        label: 'Inscrits Cumulés',
+                        data: growthCumulative,
+                        borderColor: '#a78bfa',
+                        borderWidth: 3,
+                        backgroundColor: gradientGrowth,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#7c3aed',
+                        pointBorderColor: '#fff',
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#6b6b8d', font: fontOpts } },
+                        y: { grid: { color: 'rgba(124, 58, 237, 0.05)' }, ticks: { color: '#6b6b8d', font: fontOpts, stepSize: 1 } }
+                    }
+                }
+            });
+
+            // CHART 2: Segments
+            const ctxSegments = document.getElementById('chartSegments').getContext('2d');
+            chartSegmentsInst = new Chart(ctxSegments, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Entreprises', 'Particuliers'],
+                    datasets: [{
+                        data: [ents, inds],
+                        backgroundColor: ['#7c3aed', '#3b82f6'],
+                        borderColor: '#12121e',
+                        borderWidth: 3,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#c4b5fd', font: fontOpts } }
+                    },
+                    cutout: '65%'
+                }
+            });
+
+            // CHART 3: Plans
+            const ctxPlans = document.getElementById('chartPlans').getContext('2d');
+            chartPlansInst = new Chart(ctxPlans, {
+                type: 'bar',
+                data: {
+                    labels: ['PASS Gratuit', 'ENTRY', 'ELITE Pro'],
+                    datasets: [{
+                        data: [plans.PASS, plans.ENTRY, plans.ELITE],
+                        backgroundColor: ['rgba(167, 139, 250, 0.8)', 'rgba(59, 130, 246, 0.8)', 'rgba(16, 185, 129, 0.8)'],
+                        borderColor: ['#a78bfa', '#3b82f6', '#10b981'],
+                        borderWidth: 1.5,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#6b6b8d', font: fontOpts } },
+                        y: { grid: { color: 'rgba(124, 58, 237, 0.05)' }, ticks: { color: '#6b6b8d', font: fontOpts, stepSize: 1 } }
+                    }
+                }
+            });
+
+            // CHART 4: États
+            const ctxStatuses = document.getElementById('chartStatuses').getContext('2d');
+            chartStatusesInst = new Chart(ctxStatuses, {
+                type: 'pie',
+                data: {
+                    labels: ['Actifs', 'En attente', 'Suspendus'],
+                    datasets: [{
+                        data: [active, pending, suspended],
+                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                        borderColor: '#12121e',
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#c4b5fd', font: fontOpts } }
+                    }
+                }
+            });
+        }
+
+        /* === OPERATIONS & MAINTENANCE HANDLERS === */
+        async function triggerScrape() {
+            const btn = document.getElementById('btnTriggerScrape');
+            if (!confirm("Voulez-vous lancer la collecte massive d'appels d'offres en arrière-plan ? (JAO, TELEMO, UNGM, etc.)")) return;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Collecte en cours...';
+
+            try {
+                const res = await fetch('/api/v1/admin/scrape', {
+                    method: 'POST',
+                    headers: { 'X-Admin-Password': adminPass }
+                });
+
+                if (res.ok) {
+                    showNotif('🛸 Collecte de données démarrée en arrière-plan avec succès !');
+                } else {
+                    const err = await res.json();
+                    alert('Erreur: ' + (err.detail || 'Erreur lors du déclenchement.'));
+                }
+            } catch (e) {
+                alert('Erreur réseau.');
+            } finally {
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-cloud-arrow-down"></i> Lancer la Collecte (Scrape)';
+                }, 5000); // Prevent fast double clicking
+            }
+        }
+
+        async function triggerWeeklyReports() {
+            const btn = document.getElementById('btnTriggerReports');
+            if (!confirm("⚠️ Attention : cette action va lancer l'analyse IA (Groq) de tous les tenders en attente et envoyer les rapports hebdomadaires par email à tous les inscrits éligibles.\n\nContinuer ?")) return;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyse & Envoi en cours...';
+
+            try {
+                const res = await fetch('/api/v1/admin/send_reports', {
+                    method: 'POST',
+                    headers: { 'X-Admin-Password': adminPass }
+                });
+
+                if (res.ok) {
+                    showNotif('📧 Cycle complet (Analyse IA + Envois) lancé en arrière-plan !');
+                } else {
+                    const err = await res.json();
+                    alert('Erreur: ' + (err.detail || 'Erreur lors du cycle.'));
+                }
+            } catch (e) {
+                alert('Erreur réseau.');
+            } finally {
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Lancer le Cycle IA / Rapports';
+                }, 5000);
+            }
+        }
+
+        /* === USER CRUD ACTIONS === */
         async function validate(email, type, btn) {
             const action = btn.textContent.trim();
             if (!confirm(`${action} le compte de ${email} ?`)) return;
@@ -693,7 +1100,7 @@
                 });
                 
                 if (res.ok) {
-                    showNotif('✅ Compte activé avec succès !');
+                    showNotif('✅ Compte validé et email envoyé avec succès !');
                     loadUsers();
                 } else {
                     const data = await res.json();
@@ -719,7 +1126,7 @@
                 });
                 
                 if (res.ok) {
-                    showNotif('⚠️ Compte suspendu.');
+                    showNotif('⚠️ Compte suspendu avec succès.');
                     loadUsers();
                 }
             } catch (e) {
@@ -738,7 +1145,7 @@
                 });
                 
                 if (res.ok) {
-                    showNotif('🗑️ Utilisateur supprimé.');
+                    showNotif('🗑️ Utilisateur supprimé de la base.');
                     loadUsers();
                 }
             } catch (e) {

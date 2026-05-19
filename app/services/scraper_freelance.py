@@ -44,9 +44,9 @@ class FreelanceScraperService:
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         }
 
-    def _scrape_upwork(self, keywords=["python", "web", "consultant", "ai"]) -> list[dict]:
-        """Scrape Upwork via flux RSS par mots-clés"""
-        logger.info(f"📡 Scraping Upwork (via RSS) pour les mots-clés: {keywords}")
+    def _scrape_upwork(self, keywords=["remote python", "remote web", "online consultant", "remote ai"]) -> list[dict]:
+        """Scrape Upwork via flux RSS par mots-clés ciblant le télétravail"""
+        logger.info(f"📡 Scraping Upwork (via RSS) pour les mots-clés en ligne: {keywords}")
         results = []
         
         for kw in keywords:
@@ -54,6 +54,7 @@ class FreelanceScraperService:
                 self._apply_stealth_delay()
                 params = {"q": kw, "sort": "recency"}
                 response = self.session.get(self.upwork_rss_url, params=params, headers=self._get_headers(), timeout=30)
+
                 
                 if response.status_code != 200:
                     logger.warning(f"⚠️ Upwork RSS bloqué ou indisponible pour '{kw}' ({response.status_code})")
@@ -147,8 +148,9 @@ class FreelanceScraperService:
                     description=miss["description"],
                     source_url=miss["source_url"],
                     sector=miss["sector"],
-                    location="Remote / Remote",
+                    location="En Ligne / Télétravail",
                     source_country="freelance", # Identifiant V2 pour missions individuelles
+
                     is_analyzed=False
                 )
                 

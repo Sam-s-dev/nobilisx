@@ -207,3 +207,32 @@ def delete_user(
     db.delete(user)
     db.commit()
     return {"message": f"Utilisateur {email} supprimé avec succès."}
+
+@router.post("/scrape")
+def trigger_scrape(
+    db: Session = Depends(get_db),
+    authorized: bool = Depends(verify_admin)
+):
+    """Lance la collecte de données en arrière-plan"""
+    from threading import Thread
+    from app.scheduler.jobs import job_weekly_scrape
+    
+    thread = Thread(target=job_weekly_scrape)
+    thread.start()
+    
+    return {"status": "success", "message": "Collecte massive démarrée en arrière-plan."}
+
+@router.post("/send_reports")
+def trigger_reports(
+    db: Session = Depends(get_db),
+    authorized: bool = Depends(verify_admin)
+):
+    """Lance le cycle hebdomadaire d'analyse IA et d'envoi en arrière-plan"""
+    from threading import Thread
+    from app.scheduler.jobs import job_weekly_cycle
+    
+    thread = Thread(target=job_weekly_cycle)
+    thread.start()
+    
+    return {"status": "success", "message": "Cycle complet (Analyse + Envoi) démarré en arrière-plan."}
+
