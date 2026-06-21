@@ -7,7 +7,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.limiter import limiter
@@ -17,6 +17,7 @@ from app.models.enterprise import Enterprise
 from app.schemas.enterprise import EnterpriseCreate, EnterpriseResponse, EnterpriseUpdate
 from app.services.email_service import EmailService
 from app.models.subscription import SUBSCRIPTION_PLANS
+from app.tasks import send_welcome_email_task
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ router = APIRouter(
 def create_enterprise(
     request: Request,
     enterprise_data: EnterpriseCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     existing = db.query(Enterprise).filter(Enterprise.name == enterprise_data.name).first()
@@ -89,11 +91,8 @@ def create_enterprise(
     db.commit()
     db.refresh(enterprise)
     logger.info(f"Entreprise creee: {enterprise.name} (id={enterprise.id}, plan={data['subscription_plan']}, expires={data['subscription_expires_at']})")
-    try:
-        email_service = EmailService(db)
-        email_service.send_welcome_email(enterprise)
-    except Exception as e:
-        logger.error(f"Erreur envoi email bienvenue: {e}")
+    # Envoi de l'email de bienvenue en arrière-plan
+    background_tasks.add_task(send_welcome_email_task, enterprise.id, "enterprise")
     return enterprise
 
 

@@ -6,7 +6,7 @@ CRUD complet + email de bienvenue automatique à l'inscription.
 
 import logging
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.limiter import limiter
@@ -15,6 +15,7 @@ from app.database import get_db
 from app.models.individual import Individual
 from app.schemas.individual import IndividualCreate, IndividualResponse, IndividualUpdate
 from app.services.email_service_individual import IndividualEmailService
+from app.tasks import send_welcome_email_task
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ router = APIRouter(
 def create_individual(
     request: Request,
     data: IndividualCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """
@@ -85,12 +87,8 @@ def create_individual(
         f"(id={individual.id}, plan={payload['subscription_plan']}, expires={payload['subscription_expires_at']})"
     )
 
-    # Envoi de l'email de bienvenue
-    try:
-        email_service = IndividualEmailService(db)
-        email_service.send_welcome_email(individual)
-    except Exception as e:
-        logger.error(f"❌ Erreur envoi email bienvenue (individual): {e}")
+    # Envoi de l'email de bienvenue en arrière-plan
+    background_tasks.add_task(send_welcome_email_task, individual.id, "individual")
 
     return individual
 

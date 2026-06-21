@@ -6,7 +6,7 @@ Router Administration - Validation des paiements Orange Money
 import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.enterprise import Enterprise
@@ -14,6 +14,7 @@ from app.models.individual import Individual
 from app.services.email_service import EmailService
 from app.services.email_service_individual import IndividualEmailService
 from app.config import get_settings
+from app.tasks import send_welcome_email_task
 
 from app.limiter import limiter
 from app.config import get_settings
@@ -110,6 +111,7 @@ def validate_user_payment(
     request: Request,
     email: str,
     user_type: str, # 'enterprise' or 'individual'
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     authorized: bool = Depends(verify_admin)
 ):
@@ -149,18 +151,13 @@ def validate_user_payment(
     
     logger.info(f"✅ Compte activé/rétabli pour {email} ({user_type}). Plan: {new_plan}. Expire: {user.subscription_expires_at}")
     
-    # Envoyer l'email de bienvenue/confirmation
-    email_sent = False
-    try:
-        service.send_welcome_email(user)
-        email_sent = True
-    except Exception as e:
-        logger.error(f"❌ Erreur email confirmation à {email}: {e}")
+    # Envoyer l'email de bienvenue/confirmation en arrière-plan
+    background_tasks.add_task(send_welcome_email_task, user.id, user_type)
         
     return {
         "status": "success",
         "message": f"Utilisateur {email} prêt sur le plan {new_plan}.",
-        "email_sent": email_sent
+        "email_queued": True
     }
 
 @router.post("/suspend")
