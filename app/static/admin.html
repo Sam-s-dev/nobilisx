@@ -190,10 +190,10 @@
             border: 1px solid var(--border);
             border-radius: 20px;
             backdrop-filter: blur(20px);
-            animation: slideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            transform: translateY(-20px); opacity: 0;
+            animation: slideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
         @keyframes slideDown {
+            from { transform: translateY(-20px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
         .header-left { display: flex; align-items: center; gap: 14px; }
@@ -242,14 +242,14 @@
             padding: 24px 28px; border-radius: 18px;
             backdrop-filter: blur(10px);
             transition: var(--transition);
-            animation: cardAppear 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            transform: translateY(20px); opacity: 0;
+            animation: cardAppear 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
         .stat-card:nth-child(1) { animation-delay: 0.1s; }
         .stat-card:nth-child(2) { animation-delay: 0.2s; }
         .stat-card:nth-child(3) { animation-delay: 0.3s; }
         .stat-card:nth-child(4) { animation-delay: 0.4s; }
         @keyframes cardAppear {
+            from { transform: translateY(20px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
         .stat-card:hover { 
@@ -289,9 +289,7 @@
             min-height: 350px;
             display: flex;
             flex-direction: column;
-            animation: cardAppear 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            opacity: 0;
-            transform: translateY(20px);
+            animation: cardAppear 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
         .chart-card:nth-child(1) { animation-delay: 0.15s; }
         .chart-card:nth-child(2) { animation-delay: 0.25s; }
@@ -335,9 +333,7 @@
             align-items: center;
             flex-wrap: wrap;
             gap: 20px;
-            animation: cardAppear 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
-            opacity: 0;
-            transform: translateY(20px);
+            animation: cardAppear 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
             transition: var(--transition);
         }
         .ops-panel:hover {
@@ -435,8 +431,7 @@
             background: var(--bg-card); border: 1px solid var(--border); 
             border-radius: 20px; overflow: hidden;
             backdrop-filter: blur(10px);
-            animation: cardAppear 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
-            transform: translateY(20px); opacity: 0;
+            animation: cardAppear 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
             margin-bottom: 40px;
         }
         .section-header { 
@@ -712,7 +707,12 @@
     <div id="notif"></div>
 
     <script>
-        let adminPass = localStorage.getItem('nobilis_admin_pass');
+        let adminPass = null;
+        try {
+            adminPass = localStorage.getItem('nobilis_admin_pass');
+        } catch (e) {
+            console.error("Local storage access error:", e);
+        }
         let allUsers = [];
         let currentTab = 'all';
         
@@ -736,7 +736,11 @@
             }).then(res => {
                 if (res.ok) {
                     adminPass = pass;
-                    localStorage.setItem('nobilis_admin_pass', pass);
+                    try {
+                        localStorage.setItem('nobilis_admin_pass', pass);
+                    } catch (e) {
+                        console.error("Failed to save to local storage:", e);
+                    }
                     document.getElementById('loginOverlay').style.display = 'none';
                     loadUsers();
                 } else {
@@ -753,7 +757,11 @@
         }
 
         function logout() {
-            localStorage.removeItem('nobilis_admin_pass');
+            try {
+                localStorage.removeItem('nobilis_admin_pass');
+            } catch (e) {
+                console.error("Failed to clear local storage:", e);
+            }
             location.reload();
         }
 
@@ -828,7 +836,8 @@
                 tr.style.transform = 'translateY(10px)';
                 const date = u.created_at ? new Date(u.created_at).toLocaleDateString('fr-FR') : '—';
                 const expireDate = u.expires_at ? new Date(u.expires_at).toLocaleDateString('fr-FR') : '—';
-                const initial = u.name.charAt(0).toUpperCase();
+                const userName = u.name || "Inconnu";
+                const initial = userName.charAt(0).toUpperCase();
                 const segLabel = u.type === 'enterprise' ? 'Entreprise' : 'Particulier';
                 const segBadge = u.type === 'enterprise' ? 'badge-enterprise' : 'badge-individual';
                 const segIcon = u.type === 'enterprise' ? 'fa-building' : 'fa-user';
@@ -853,7 +862,7 @@
                         <div class="user-info">
                             <div class="user-avatar">${initial}</div>
                             <div>
-                                <span class="user-name">${u.name}</span>
+                                <span class="user-name">${userName}</span>
                                 <span class="user-email">${u.email}</span>
                             </div>
                         </div>
@@ -878,7 +887,12 @@
 
         /* === DYNAMIC REAL-TIME PREMIUM CHARTS === */
         function renderCharts() {
-            if (allUsers.length === 0) return;
+            try {
+                if (typeof Chart === 'undefined') {
+                    console.warn("Chart.js is not loaded. Skipping statistics charts.");
+                    return;
+                }
+                if (allUsers.length === 0) return;
 
             // 1. DATASET 1: Evolution Temporelle (Growth Line Chart)
             const growthData = {};
@@ -1024,6 +1038,9 @@
                     }
                 }
             });
+            } catch (error) {
+                console.error("Failed to render charts:", error);
+            }
         }
 
         /* === OPERATIONS & MAINTENANCE HANDLERS === */
