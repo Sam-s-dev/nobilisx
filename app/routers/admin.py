@@ -233,3 +233,40 @@ def trigger_reports(
     
     return {"status": "success", "message": "Cycle complet (Analyse + Envoi) démarré en arrière-plan."}
 
+@router.get("/test_email")
+def test_email(
+    email: str,
+    password: str,
+    db: Session = Depends(get_db)
+):
+    """Endpoint diagnostic pour tester l'envoi d'e-mail."""
+    if password.strip() != settings.ADMIN_PASSWORD.strip():
+        raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+        
+    from app.services.email_service import EmailService
+    from fastapi.responses import JSONResponse
+    
+    service = EmailService(db)
+    subject = "NOBILIS X - Test Diagnostic"
+    html_body = "<h1>Test de configuration SMTP</h1><p>Si vous recevez ce message, votre configuration SMTP est 100% correcte.</p>"
+    
+    try:
+        service._send_mailjet_http(email, subject, html_body)
+        return {
+            "status": "success",
+            "message": f"E-mail de test envoyé avec succès à {email}.",
+            "details": f"Hôte SMTP utilisé : {settings.SMTP_HOST}"
+        }
+    except Exception as e:
+        logger.error(f"❌ Échec de l'envoi de test : {e}", exc_info=True)
+        import traceback
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "failed",
+                "message": "L'envoi de l'e-mail a échoué.",
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+        )
+
