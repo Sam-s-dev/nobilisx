@@ -71,6 +71,20 @@ async def lifespan(app: FastAPI):
     init_db()
     logger.info("✅ Base de données initialisée")
 
+    # Valider la configuration SMTP/Mailjet
+    if not settings.SMTP_USER or not settings.SMTP_PASSWORD or not settings.SMTP_FROM:
+        logger.warning("⚠️" * 30)
+        logger.warning("⚠️ CONFIGURATION SMTP INCOMPLÈTE : Les e-mails ne pourront pas s'envoyer !")
+        logger.warning(f"  SMTP_HOST: {settings.SMTP_HOST}")
+        logger.warning(f"  SMTP_USER: {'Définie' if settings.SMTP_USER else 'VIDE (Avertissement)'}")
+        logger.warning(f"  SMTP_PASSWORD: {'Définie' if settings.SMTP_PASSWORD else 'VIDE (Avertissement)'}")
+        logger.warning(f"  SMTP_FROM: {'Définie' if settings.SMTP_FROM else 'VIDE (Avertissement)'}")
+        logger.warning("  -> Pour corriger sur Render, configurez les variables d'environnement :")
+        logger.warning("     SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM dans l'onglet Environment.")
+        logger.warning("⚠️" * 30)
+    else:
+        logger.info(f"📧 SMTP configuré avec succès (Hôte : {settings.SMTP_HOST}, Expéditeur : {settings.SMTP_FROM})")
+
     # Démarrer le scheduler
     init_scheduler()
     logger.info("✅ Scheduler initialisé")
