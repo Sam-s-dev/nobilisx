@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     SMTP_FROM: str = ""
     SMTP_TLS: bool = True
 
+    # --- Mailjet HTTP API (pour hébergement cloud où SMTP est bloqué) ---
+    MAILJET_API_KEY: str = ""
+    MAILJET_SECRET_KEY: str = ""
+
     # --- Scraping ---
     TELEMO_BASE_URL: str = "https://telemo.gov.gn"
     JAO_BASE_URL: str = "https://www.jaoguinee.com"

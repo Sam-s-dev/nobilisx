@@ -246,16 +246,24 @@ def test_email(
     from app.services.email_service import EmailService
     from fastapi.responses import JSONResponse
     
+    # Diagnostic de la méthode d'envoi
+    has_mailjet_api = bool(settings.MAILJET_API_KEY and settings.MAILJET_SECRET_KEY)
+    method = "Mailjet HTTP API (HTTPS)" if has_mailjet_api else f"SMTP ({settings.SMTP_HOST}:{settings.SMTP_PORT})"
+    
     service = EmailService(db)
     subject = "NOBILIS X - Test Diagnostic"
-    html_body = "<h1>Test de configuration SMTP</h1><p>Si vous recevez ce message, votre configuration SMTP est 100% correcte.</p>"
+    html_body = f"""<h1 style="color:#c9a84c;">NOBILIS X — Test Réussi ✅</h1>
+    <p>Si vous recevez ce message, votre configuration email est 100% correcte.</p>
+    <p><strong>Méthode utilisée :</strong> {method}</p>
+    <p><strong>Expéditeur :</strong> {settings.SMTP_FROM}</p>"""
     
     try:
         service._send_mailjet_http(email, subject, html_body)
         return {
             "status": "success",
             "message": f"E-mail de test envoyé avec succès à {email}.",
-            "details": f"Hôte SMTP utilisé : {settings.SMTP_HOST}"
+            "method": method,
+            "mailjet_api_configured": has_mailjet_api,
         }
     except Exception as e:
         logger.error(f"❌ Échec de l'envoi de test : {e}", exc_info=True)
@@ -265,8 +273,10 @@ def test_email(
             content={
                 "status": "failed",
                 "message": "L'envoi de l'e-mail a échoué.",
+                "method_attempted": method,
+                "mailjet_api_configured": has_mailjet_api,
                 "error": str(e),
+                "suggestion": "Configurez MAILJET_API_KEY et MAILJET_SECRET_KEY si SMTP est bloqué" if not has_mailjet_api else "Vérifiez vos clés API Mailjet",
                 "traceback": traceback.format_exc()
             }
         )
-

@@ -72,18 +72,32 @@ async def lifespan(app: FastAPI):
     logger.info("✅ Base de données initialisée")
 
     # Valider la configuration SMTP/Mailjet
-    if not settings.SMTP_USER or not settings.SMTP_PASSWORD or not settings.SMTP_FROM:
+    if not settings.SMTP_FROM:
         logger.warning("⚠️" * 30)
-        logger.warning("⚠️ CONFIGURATION SMTP INCOMPLÈTE : Les e-mails ne pourront pas s'envoyer !")
-        logger.warning(f"  SMTP_HOST: {settings.SMTP_HOST}")
-        logger.warning(f"  SMTP_USER: {'Définie' if settings.SMTP_USER else 'VIDE (Avertissement)'}")
-        logger.warning(f"  SMTP_PASSWORD: {'Définie' if settings.SMTP_PASSWORD else 'VIDE (Avertissement)'}")
-        logger.warning(f"  SMTP_FROM: {'Définie' if settings.SMTP_FROM else 'VIDE (Avertissement)'}")
-        logger.warning("  -> Pour corriger sur Render, configurez les variables d'environnement :")
-        logger.warning("     SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM dans l'onglet Environment.")
+        logger.warning("⚠️ SMTP_FROM non défini : Les e-mails ne pourront pas s'envoyer !")
         logger.warning("⚠️" * 30)
     else:
-        logger.info(f"📧 SMTP configuré avec succès (Hôte : {settings.SMTP_HOST}, Expéditeur : {settings.SMTP_FROM})")
+        logger.info(f"📧 Expéditeur email : {settings.SMTP_FROM}")
+
+    # Vérifier la méthode d'envoi disponible
+    if settings.MAILJET_API_KEY and settings.MAILJET_SECRET_KEY:
+        logger.info("✅ Mailjet HTTP API configurée (HTTPS port 443) — Méthode prioritaire")
+        logger.info(f"   MAILJET_API_KEY: {settings.MAILJET_API_KEY[:8]}...")
+    else:
+        logger.warning("⚠️ MAILJET_API_KEY / MAILJET_SECRET_KEY non définis")
+        if settings.SMTP_HOST and settings.SMTP_HOST != "in-v3.mailjet.com":
+            logger.warning(
+                f"   SMTP configuré vers {settings.SMTP_HOST}:{settings.SMTP_PORT} "
+                "— peut échouer sur Render/cloud (ports SMTP bloqués)"
+            )
+            logger.warning(
+                "   💡 Créez un compte gratuit sur https://www.mailjet.com et ajoutez "
+                "MAILJET_API_KEY + MAILJET_SECRET_KEY dans les variables d'environnement"
+            )
+        if settings.SMTP_USER and settings.SMTP_PASSWORD:
+            logger.info(f"   SMTP fallback: {settings.SMTP_HOST}:{settings.SMTP_PORT} (utilisera SMTP si API indisponible)")
+        else:
+            logger.warning("   ⚠️ SMTP_USER / SMTP_PASSWORD non définis — aucune méthode d'envoi disponible !")
 
     # Démarrer le scheduler
     init_scheduler()

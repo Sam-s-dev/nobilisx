@@ -308,16 +308,35 @@ class IndividualEmailService:
         wait=wait_exponential(multiplier=2, min=5, max=30),
     )
     def _send_mailjet_http(self, to_email: str, subject: str, html_body: str) -> bool:
-        """Envoie un email. Route intelligemment entre l'API REST Mailjet et le SMTP standard selon la configuration."""
-        # Si l'hôte SMTP n'est pas Mailjet, utiliser le SMTP standard directement
-        if settings.SMTP_HOST != "in-v3.mailjet.com":
-            logger.info("Configuration SMTP non-Mailjet détectée. Utilisation du SMTP standard pour particulier...")
-            return self._send_smtp_standard(to_email, subject, html_body)
+        """Envoi intelligent: API HTTP Mailjet (prioritaire) → SMTP standard (fallback).
+        
+        Sur les hébergements cloud (Render, Railway), les ports SMTP (587/465)
+        sont souvent bloqués. L'API REST Mailjet utilise HTTPS (port 443) qui
+        fonctionne partout.
+        """
+        # ── Méthode 1: API REST Mailjet via HTTPS (fonctionne sur Render/cloud) ──
+        if settings.MAILJET_API_KEY and settings.MAILJET_SECRET_KEY:
+            try:
+                return self._send_via_mailjet_api(to_email, subject, html_body)
+            except Exception as e:
+                logger.warning(f"⚠️ Échec API Mailjet REST (Individual): {e}. Tentative SMTP en fallback...")
 
-        # Si c'est Mailjet, tenter l'API REST d'abord
-        logger.info(f"📨 Envoi Mailjet API (Individual) -> {to_email}")
+        # ── Méthode 2: SMTP standard (fonctionne en local/VPS) ──
+        try:
+            return self._send_smtp_standard(to_email, subject, html_body)
+        except OSError as e:
+            logger.error(
+                f"❌ SMTP bloqué (hébergement cloud probable): {e}\n"
+                "💡 Solution: Configurez MAILJET_API_KEY et MAILJET_SECRET_KEY "
+                "pour l'envoi via API HTTP. Compte gratuit sur https://www.mailjet.com"
+            )
+            raise
+
+    def _send_via_mailjet_api(self, to_email: str, subject: str, html_body: str) -> bool:
+        """Envoie un email via l'API REST Mailjet (HTTPS port 443)."""
+        logger.info(f"📨 Tentative API Mailjet HTTP (Individual) → {to_email}")
         api_url = "https://api.mailjet.com/v3.1/send"
-        auth = (settings.SMTP_USER, settings.SMTP_PASSWORD)
+        auth = (settings.MAILJET_API_KEY, settings.MAILJET_SECRET_KEY)
 
         plain_text = self._clean_plain_text(getattr(self, '_text_summary', '') or subject)
 
@@ -328,11 +347,7 @@ class IndividualEmailService:
                         "Email": settings.SMTP_FROM,
                         "Name": "NOBILIS X"
                     },
-                    "To": [
-                        {
-                            "Email": to_email
-                        }
-                    ],
+                    "To": [{"Email": to_email}],
                     "Subject": self._clean_subject(subject),
                     "TextPart": f"Salut,\n\nVoici tes missions de la semaine sur NOBILIS X.\n\n{plain_text}",
                     "HTMLPart": html_body,
@@ -341,18 +356,11 @@ class IndividualEmailService:
             ]
         }
 
-        try:
-            response = requests.post(api_url, json=payload, auth=auth, timeout=30)
-            response.raise_for_status()
-            logger.info(f"✅ Email envoyé (Individual) à {to_email}")
-            return True
-        except Exception as e:
-            logger.warning(f"⚠️ Échec API Mailjet REST (Individual) ({e}). Fallback vers Mailjet SMTP standard...")
-            try:
-                return self._send_smtp_standard(to_email, subject, html_body)
-            except Exception as smtp_err:
-                logger.error(f"❌ Échec ultime de l'envoi SMTP (Individual) : {smtp_err}")
-                raise e
+        response = requests.post(api_url, json=payload, auth=auth, timeout=30)
+        response.raise_for_status()
+        result = response.json()
+        logger.info(f"✅ Email envoyé via API Mailjet HTTP (Individual) à {to_email} | Status: {result.get('Messages', [{}])[0].get('Status', 'unknown')}")
+        return True
 
     # ------------------------------------------------------------------
     #  Email de bienvenue — Particulier
