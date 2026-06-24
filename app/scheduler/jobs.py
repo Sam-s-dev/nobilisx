@@ -236,7 +236,6 @@ def scheduler_event_listener(event):
     else:
         logger.info(f"Job {event.job_id} exécuté avec succès")
 
-
 def init_scheduler():
     """Initialise le planning V2 Bi-segment"""
     scheduler.add_listener(scheduler_event_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
@@ -248,6 +247,7 @@ def init_scheduler():
         id="weekly_scrape",
         name="NOBILIS X — Collecte Hebdomadaire (Samedi)",
         replace_existing=True,
+        misfire_grace_time=3600,
     )
 
     # 2. ANALYSE & ENVOI : Chaque Lundi à l'heure définie (Défaut 8h)
@@ -257,6 +257,7 @@ def init_scheduler():
         id="weekly_analysis_send",
         name="NOBILIS X — Cycle Complet (Lundi)",
         replace_existing=True,
+        misfire_grace_time=3600,
     )
 
     # 3. ALERTES ELITE : 2 fois par jour (Matin 8h45 & Soir 18h45)
@@ -266,6 +267,7 @@ def init_scheduler():
         id="elite_realtime",
         name="NOBILIS X — Alertes ELITE",
         replace_existing=True,
+        misfire_grace_time=3600,
     )
 
     # 4. HORLOGE NOBILIS : Toutes les 2 heures (pour être réactif sur l'essai de 48h)
@@ -275,6 +277,7 @@ def init_scheduler():
         id="check_expirations",
         name="NOBILIS X — Horloge Expirations & Abonnements",
         replace_existing=True,
+        misfire_grace_time=3600,
     )
 
     # 5. RAPPELS D'EXPIRATION : Tous les jours à 9h00
@@ -284,6 +287,7 @@ def init_scheduler():
         id="daily_reminders",
         name="NOBILIS X — Rappels d'expiration (7j / 3j)",
         replace_existing=True,
+        misfire_grace_time=3600,
     )
 
     scheduler.start()

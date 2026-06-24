@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.enterprise import Enterprise
 from app.models.individual import Individual
+from app.models.email_log import EmailLog
 from app.services.email_service import EmailService
 from app.services.email_service_individual import IndividualEmailService
 from app.config import get_settings
@@ -280,3 +281,30 @@ def test_email(
                 "traceback": traceback.format_exc()
             }
         )
+
+@router.get("/email_logs")
+def list_email_logs(
+    password: Optional[str] = Query(None),
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    x_admin_password: Optional[str] = Header(None, alias="X-Admin-Password")
+):
+    """Liste les derniers logs d'envoi d'e-mails pour diagnostic admin"""
+    provided = (password or x_admin_password or "").strip()
+    expected = settings.ADMIN_PASSWORD.strip()
+    if not provided or provided != expected:
+        raise HTTPException(status_code=401, detail="Mot de passe admin incorrect.")
+
+    logs = db.query(EmailLog).order_by(EmailLog.created_at.desc()).limit(limit).all()
+    return [
+        {
+            "id": log.id,
+            "recipient": log.recipient_email,
+            "subject": log.subject,
+            "status": log.status,
+            "error_message": log.error_message,
+            "sent_at": log.sent_at.isoformat() if log.sent_at else None,
+            "created_at": log.created_at.isoformat() if log.created_at else None
+        }
+        for log in logs
+    ]
