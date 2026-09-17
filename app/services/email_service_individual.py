@@ -28,7 +28,15 @@ from app.models.individual import Individual
 from app.models.tender import Tender
 from app.models.analysis import Analysis
 from app.models.email_log import EmailLog
+from app.services import email_templates as tpl
 from app.services.email_sender import send_email
+from app.services.subscription import (
+    PASS_TRIAL_DAYS,
+    blocked_reason,
+    is_active,
+    is_elite,
+    plan_base,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -126,8 +134,8 @@ class IndividualEmailService:
         text_lines = []
 
         # Détermination du nombre de missions selon le plan
-        plan = (individual.subscription_plan or "PASS").upper()
-        max_missions = 10 if plan == "ELITE" else 5
+        # Les ELITE voient 10 missions, les autres 5.
+        max_missions = 10 if is_elite(individual) else 5
         
         for item in scored_missions[:max_missions]:
             score = item["score"]
@@ -405,6 +413,176 @@ class IndividualEmailService:
             return False
 
     # ------------------------------------------------------------------
+    #  Envoi + journalisation
+    # ------------------------------------------------------------------
+
+    def _dispatch(self, individual: Individual, subject: str, html_body: str) -> bool:
+        """Journalise puis envoie. Toute erreur est tracee dans email_logs."""
+        if not individual.email:
+            return False
+
+        email_log = EmailLog(
+            individual_id=individual.id,
+            recipient_email=individual.email,
+            subject=self._clean_subject(subject),
+            status="pending",
+        )
+        self.db.add(email_log)
+        self.db.flush()
+
+        try:
+            self._send_email_intelligent(individual.email, subject, html_body)
+            email_log.status = "sent"
+            email_log.sent_at = datetime.utcnow()
+            self.db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Échec envoi '{subject}' à {individual.email} : {e}")
+            email_log.status = "failed"
+            email_log.error_message = str(e)[:500]
+            self.db.commit()
+            return False
+
+    # ------------------------------------------------------------------
+    #  Alerte ELITE temps reel — Particulier
+    # ------------------------------------------------------------------
+
+    def send_elite_alert(self, individual: Individual, scored_missions: list[dict]) -> bool:
+        """Alerte immediate sur des missions a fort score (ELITE uniquement)."""
+        if not individual.email or not scored_missions:
+            return False
+
+        count = len(scored_missions)
+        first_name = individual.full_name.split()[0]
+        subject = f"ALERTE NOBILIS X - {count} mission{'s' if count > 1 else ''} qui te correspond{'ent' if count > 1 else ''}"
+
+        cards = ""
+        text_lines = []
+        for item in scored_missions[:5]:
+            score = item["score"]
+            title = self._clean_text(item.get("mission_title", item.get("tender_title", ""))[:90])
+            summary = self._clean_text(item.get("summary", item.get("explanation", ""))[:180])
+            url = item.get("source_url", "") or "#"
+            cards += f"""
+            <div style="background:#1e1b4b;border:1px solid #312e81;border-left:4px solid #22c55e;border-radius:10px;padding:16px 18px;margin-bottom:12px;">
+              <p style="margin:0 0 6px 0;font-size:11px;font-weight:800;color:#22c55e;letter-spacing:1px;">MATCH {score:.0f}/100</p>
+              <p style="margin:0 0 6px 0;font-size:15px;font-weight:700;color:#ffffff;line-height:1.4;">{title}</p>
+              <p style="margin:0 0 12px 0;font-size:13px;color:#94a3b8;line-height:1.55;">{summary}</p>
+              <a href="{url}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#ffffff;padding:9px 20px;border-radius:100px;text-decoration:none;font-size:12px;font-weight:700;">Postule maintenant &#x2192;</a>
+            </div>"""
+            text_lines.append(f"- {self._clean_plain_text(item.get('mission_title', '')[:90])} ({score:.0f}/100)")
+
+        self._text_summary = "\n".join(text_lines)
+
+        body = (
+            tpl.paragraph(
+                tpl.INDIVIDUAL,
+                f"<strong>{self._clean_text(first_name)}</strong>, on vient de repérer "
+                f"{count} mission{'s' if count > 1 else ''} qui colle{'nt' if count > 1 else ''} vraiment à ton profil.",
+            )
+            + tpl.paragraph(
+                tpl.INDIVIDUAL,
+                "Tu la reçois tout de suite, sans attendre ton rapport : "
+                "c'est l'avantage de ton abonnement <strong>NOBILIS ELITE</strong>.",
+            )
+            + cards
+            + tpl.info_box(
+                tpl.INDIVIDUAL,
+                "Sur les missions en ligne, les premiers candidats sont souvent retenus. Postule vite.",
+            )
+        )
+
+        html_body = tpl.render(
+            tpl.INDIVIDUAL,
+            heading=f"Alerte : {count} mission{'s' if count > 1 else ''} pour toi",
+            body_html=body,
+            preheader=f"{count} mission(s) à fort match viennent d'être détectées.",
+        )
+        return self._dispatch(individual, subject, html_body)
+
+    # ------------------------------------------------------------------
+    #  Expiration et renouvellement — Particulier
+    # ------------------------------------------------------------------
+
+    def send_expiration_notice(self, individual: Individual) -> bool:
+        """Previent que l'abonnement vient d'expirer."""
+        if not individual.email:
+            return False
+
+        plan = plan_base(individual)
+        first_name = self._clean_text(individual.full_name.split()[0])
+        subject = f"NOBILIS X - Tes missions sont en pause, {individual.full_name.split()[0]}"
+
+        if plan == "PASS":
+            body = (
+                tpl.paragraph(tpl.INDIVIDUAL, f"<strong>{first_name}</strong>, ton essai gratuit de {PASS_TRIAL_DAYS} jours vient de se terminer.")
+                + tpl.paragraph(tpl.INDIVIDUAL, "Tu ne recevras plus de missions tant que ton compte n'est pas activé.")
+                + tpl.action_box(
+                    tpl.INDIVIDUAL,
+                    heading="Activer ton abonnement",
+                    intro="Fais un dépôt Orange Money de <strong>1 000 000 GNF</strong> (ENTRY) ou <strong>1 500 000 GNF</strong> (ELITE) au :",
+                    footnote="Précise « NOBILIS » lors du dépôt, puis envoie la capture sur WhatsApp pour une activation immédiate.",
+                )
+            )
+        else:
+            amount = "1 500 000" if plan == "ELITE" else "1 000 000"
+            body = (
+                tpl.paragraph(tpl.INDIVIDUAL, f"<strong>{first_name}</strong>, ton abonnement <strong>NOBILIS {plan}</strong> a expiré.")
+                + tpl.paragraph(tpl.INDIVIDUAL, "Tes missions sont en pause : tu ne recevras plus rien tant que le renouvellement n'est pas fait.")
+                + tpl.action_box(
+                    tpl.INDIVIDUAL,
+                    heading="Renouveler pour 1 an",
+                    intro="Fais un dépôt Orange Money de",
+                    amount=amount,
+                    footnote="Envoie ensuite la capture sur WhatsApp : ton compte est réactivé dans la foulée.",
+                )
+                + tpl.info_box(tpl.INDIVIDUAL, "Ton profil et tes compétences sont conservés. Le renouvellement les réactive à l'identique.")
+            )
+
+        html_body = tpl.render(
+            tpl.INDIVIDUAL,
+            heading="Ton accès est en pause",
+            body_html=body,
+            preheader="Tes missions NOBILIS X sont en pause. Voici comment les relancer.",
+        )
+        return self._dispatch(individual, subject, html_body)
+
+    def send_renewal_confirmation(self, individual: Individual) -> bool:
+        """Confirme un renouvellement ou un retablissement."""
+        if not individual.email:
+            return False
+
+        plan = plan_base(individual)
+        first_name = self._clean_text(individual.full_name.split()[0])
+        expires = getattr(individual, "subscription_expires_at", None)
+        expires_str = expires.strftime("%d/%m/%Y") if expires else "dans 1 an"
+        cadence = "chaque matin à 7h" if plan == "ELITE" else "chaque lundi à 8h"
+        nb = 10 if plan == "ELITE" else 5
+
+        subject = f"NOBILIS X - Abonnement renouvelé, {individual.full_name.split()[0]}"
+
+        body = (
+            tpl.paragraph(tpl.INDIVIDUAL, f"<strong>Merci {first_name} !</strong> Ton paiement est confirmé et ton compte <strong>NOBILIS {plan}</strong> est de nouveau actif.")
+            + tpl.paragraph(tpl.INDIVIDUAL, f"Tu recevras tes <strong>{nb} meilleures missions</strong> {cadence}, avec ton score de compatibilité.")
+            + tpl.info_box(tpl.INDIVIDUAL, f"Ton abonnement court jusqu'au <strong>{expires_str}</strong>. On te préviendra 7 jours puis 3 jours avant l'échéance.")
+        )
+
+        if plan == "ELITE":
+            body += tpl.paragraph(
+                tpl.INDIVIDUAL,
+                "En ELITE, tu reçois aussi les <strong>alertes immédiates</strong> à 8h45 et 18h45 "
+                "dès qu'une mission à fort match apparaît.",
+            )
+
+        html_body = tpl.render(
+            tpl.INDIVIDUAL,
+            heading="Compte réactivé",
+            body_html=body,
+            preheader=f"Ton compte NOBILIS {plan} est actif jusqu'au {expires_str}.",
+        )
+        return self._dispatch(individual, subject, html_body)
+
+    # ------------------------------------------------------------------
     #  Rapport hebdomadaire — Particulier
     # ------------------------------------------------------------------
 
@@ -414,11 +592,13 @@ class IndividualEmailService:
         scored_missions: list[dict],
         recommendations: list[str] | None = None,
     ) -> bool:
-        """Envoie le rapport hebdomadaire au particulier."""
+        """Envoie le rapport periodique au particulier."""
         if not individual.email:
             return False
 
-        subject = f"NOBILIS X - {len(scored_missions[:10])} missions pour toi cette semaine"
+        nb = len(scored_missions[:10 if is_elite(individual) else 5])
+        periode = "aujourd'hui" if is_elite(individual) else "cette semaine"
+        subject = f"NOBILIS X - {nb} missions pour toi {periode}"
         html_body = self._build_individual_html(individual, scored_missions, recommendations)
 
         email_log = EmailLog(
@@ -446,13 +626,29 @@ class IndividualEmailService:
     #  Envoi en masse — Tous les particuliers
     # ------------------------------------------------------------------
 
-    def send_all_individual_reports(self) -> dict:
-        """
-        Envoie le rapport hebdomadaire à tous les particuliers éligibles.
-        Utilise IndividualScorerService pour le scoring.
+    def send_all_individual_reports(self, elite_only: bool | None = None, only_if_new: bool = False) -> dict:
+        """Envoie le rapport aux particuliers eligibles.
+
+        elite_only=None  : tous les particuliers actifs (cycle hebdomadaire du lundi)
+        elite_only=True  : uniquement les ELITE (rapport quotidien de 7h)
+        elite_only=False : uniquement les non-ELITE (PASS et ENTRY)
+
+        only_if_new=True : n'envoie qu'aux particuliers dont le classement contient
+        au moins une mission parue dans les dernieres 24h.
         """
         from app.services.scorer_individual import IndividualScorerService
         from app.services.ai_analyzer import AIAnalyzerService
+
+        recent_ids: set[int] = set()
+        if only_if_new:
+            cutoff = datetime.utcnow() - timedelta(hours=24)
+            recent_ids = {
+                row[0]
+                for row in self.db.query(Tender.id).filter(Tender.created_at >= cutoff).all()
+            }
+            if not recent_ids:
+                logger.info("Aucune nouvelle mission depuis 24h — rapport quotidien ELITE ignoré")
+                return {"sent": 0, "failed": 0, "skipped": 0}
 
         individuals = self.db.query(Individual).filter(
             Individual.email.isnot(None)
@@ -465,27 +661,29 @@ class IndividualEmailService:
 
         for individual in individuals:
             try:
-                # ── Bloquer les comptes en attente de paiement ──
-                plan = (individual.subscription_plan or "PASS").upper()
-
-                if plan.startswith("PENDING_") or plan.startswith("SUSPENDED_"):
+                # Comptes en attente de paiement, suspendus ou expirés : pas de rapport
+                if not is_active(individual):
                     logger.info(
-                        f"⏸️ Rapport ignoré pour {individual.full_name} ({plan}) — en attente ou bloqué"
+                        f"⏸️ Rapport ignoré pour {individual.full_name} : "
+                        f"{blocked_reason(individual)}"
                     )
                     results["skipped"] += 1
                     continue
 
-                # ── Bloquer les PASS expirés (essai 1 semaine) ──
-                if plan == "PASS":
-                    if datetime.utcnow() > individual.created_at + timedelta(days=7):
-                        logger.info(f"⏸️ PASS expiré pour {individual.full_name} — rapport ignoré")
-                        results["skipped"] += 1
-                        continue
+                # Les ELITE ont leur rapport quotidien : pas de doublon le lundi.
+                if elite_only is not None and is_elite(individual) != elite_only:
+                    results["skipped"] += 1
+                    continue
 
                 # ── Scoring des missions freelance ──
                 scored = scorer.score_all_for_individual(individual)
                 if not scored:
                     logger.info(f"📭 Aucune mission pour {individual.full_name}")
+                    results["skipped"] += 1
+                    continue
+
+                if only_if_new and not any(item["tender_id"] in recent_ids for item in scored[:10]):
+                    logger.info(f"Aucune nouveauté pour {individual.full_name} — rapport quotidien ignoré")
                     results["skipped"] += 1
                     continue
 

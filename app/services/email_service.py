@@ -12,7 +12,7 @@ import html
 import logging
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -21,7 +21,15 @@ from app.models.enterprise import Enterprise
 from app.models.tender import Tender
 from app.models.analysis import Analysis
 from app.models.email_log import EmailLog
+from app.services import email_templates as tpl
 from app.services.email_sender import send_email
+from app.services.subscription import (
+    PASS_TRIAL_DAYS,
+    blocked_reason,
+    is_active,
+    is_elite,
+    plan_base,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -255,16 +263,21 @@ class EmailService:
     #  Rapport quotidien
     # ------------------------------------------------------------------
 
-    def send_daily_report(self, enterprise: Enterprise, scored_analyses: list[dict], recommendations: list[str] | None = None, pdf_path: str | None = None) -> bool:
+    def _dispatch(self, enterprise: Enterprise, subject: str, html_body: str,
+                  pdf_path: str | None = None) -> bool:
+        """Journalise puis envoie. Toute erreur est tracee dans email_logs."""
         if not enterprise.email:
             return False
-        subject = f"NOBILIS X - {len(scored_analyses)} opportunités pour {enterprise.name}"
-        html_body = self._build_html_body(enterprise, scored_analyses, recommendations, has_pdf=bool(pdf_path))
-        
-        email_log = EmailLog(enterprise_id=enterprise.id, recipient_email=enterprise.email, subject=self._clean_subject(subject), status="pending")
+
+        email_log = EmailLog(
+            enterprise_id=enterprise.id,
+            recipient_email=enterprise.email,
+            subject=self._clean_subject(subject),
+            status="pending",
+        )
         self.db.add(email_log)
         self.db.flush()
-        
+
         try:
             self._send_email_intelligent(enterprise.email, subject, html_body, pdf_path)
             email_log.status = "sent"
@@ -272,10 +285,166 @@ class EmailService:
             self.db.commit()
             return True
         except Exception as e:
+            logger.error(f"Échec envoi '{subject}' à {enterprise.email} : {e}")
             email_log.status = "failed"
             email_log.error_message = str(e)[:500]
             self.db.commit()
             return False
+
+    def send_daily_report(self, enterprise: Enterprise, scored_analyses: list[dict], recommendations: list[str] | None = None, pdf_path: str | None = None) -> bool:
+        if not enterprise.email:
+            return False
+        cadence = "Quotidien" if is_elite(enterprise) else "Hebdomadaire"
+        subject = f"NOBILIS X - {len(scored_analyses)} opportunités pour {enterprise.name} ({cadence})"
+        html_body = self._build_html_body(enterprise, scored_analyses, recommendations, has_pdf=bool(pdf_path))
+        return self._dispatch(enterprise, subject, html_body, pdf_path)
+
+    # ------------------------------------------------------------------
+    #  Alerte ELITE temps reel
+    # ------------------------------------------------------------------
+
+    def send_elite_alert(self, enterprise: Enterprise, scored_analyses: list[dict]) -> bool:
+        """Alerte immediate sur des opportunites a fort score (ELITE uniquement).
+
+        Volontairement distincte du rapport periodique : sujet, couleur et ton
+        different, pour que l'abonne ELITE voie ce qu'il paie.
+        """
+        if not enterprise.email or not scored_analyses:
+            return False
+
+        count = len(scored_analyses)
+        subject = (
+            f"ALERTE NOBILIS X - {count} opportunité{'s' if count > 1 else ''} "
+            f"à fort potentiel pour {enterprise.name}"
+        )
+
+        cards = ""
+        text_lines = []
+        for item in scored_analyses[:5]:
+            score = item["score"]
+            title = self._clean_text(item["tender_title"][:90])
+            summary = self._clean_text(item.get("summary", "")[:180])
+            url = item.get("source_url", "") or "#"
+            cards += f"""
+            <div style="background:#161b22;border:1px solid #30363d;border-left:4px solid #e74c3c;border-radius:10px;padding:16px 18px;margin-bottom:12px;">
+              <p style="margin:0 0 6px 0;font-size:11px;font-weight:800;color:#e74c3c;letter-spacing:1px;">SCORE {score:.0f}/100</p>
+              <p style="margin:0 0 6px 0;font-size:15px;font-weight:700;color:#ffffff;line-height:1.4;">{title}</p>
+              <p style="margin:0 0 12px 0;font-size:13px;color:#8b949e;line-height:1.55;">{summary}</p>
+              <a href="{url}" style="display:inline-block;background:#c9a84c;color:#0d1117;padding:9px 20px;border-radius:100px;text-decoration:none;font-size:12px;font-weight:700;">Voir l'offre &#x2192;</a>
+            </div>"""
+            text_lines.append(f"- {self._clean_plain_text(item['tender_title'][:90])} ({score:.0f}/100)")
+
+        self._text_summary = "\n".join(text_lines)
+
+        body = (
+            tpl.paragraph(
+                tpl.ENTERPRISE,
+                f"<strong>{self._clean_text(enterprise.name)}</strong>, notre veille vient "
+                f"de détecter {count} opportunité{'s' if count > 1 else ''} "
+                "correspondant fortement à votre profil.",
+            )
+            + tpl.paragraph(
+                tpl.ENTERPRISE,
+                "Vous la recevez maintenant, sans attendre votre rapport périodique : "
+                "c'est l'avantage de votre abonnement <strong>NOBILIS ELITE</strong>.",
+            )
+            + cards
+            + tpl.info_box(
+                tpl.ENTERPRISE,
+                "Sur un appel d'offres, les premiers dossiers déposés sont souvent "
+                "les mieux préparés. Ne tardez pas.",
+            )
+        )
+
+        html_body = tpl.render(
+            tpl.ENTERPRISE,
+            heading=f"Alerte : {count} opportunité{'s' if count > 1 else ''} détectée{'s' if count > 1 else ''}",
+            body_html=body,
+            preheader=f"{count} opportunité(s) à fort score viennent d'être détectées.",
+        )
+        return self._dispatch(enterprise, subject, html_body)
+
+    # ------------------------------------------------------------------
+    #  Expiration et renouvellement
+    # ------------------------------------------------------------------
+
+    def send_expiration_notice(self, enterprise: Enterprise) -> bool:
+        """Previent que l'abonnement vient d'expirer et que les rapports s'arretent."""
+        if not enterprise.email:
+            return False
+
+        plan = plan_base(enterprise)
+        clean_name = self._clean_text(enterprise.name)
+        subject = f"NOBILIS X - Vos rapports sont suspendus, {enterprise.name}"
+
+        if plan == "PASS":
+            body = (
+                tpl.paragraph(tpl.ENTERPRISE, f"<strong>{clean_name}</strong>, votre essai gratuit de {PASS_TRIAL_DAYS} jours est terminé.")
+                + tpl.paragraph(tpl.ENTERPRISE, "Vous ne recevrez plus de rapport et l'accès à votre tableau de bord est désormais fermé.")
+                + tpl.paragraph(tpl.ENTERPRISE, "Pour continuer à recevoir les appels d'offres qui correspondent à votre secteur, choisissez votre plan :")
+                + tpl.action_box(
+                    tpl.ENTERPRISE,
+                    heading="Activer votre abonnement",
+                    intro="Effectuez un dépôt Orange Money de <strong>2 000 000 GNF</strong> (ENTRY) ou <strong>3 000 000 GNF</strong> (ELITE) au numéro :",
+                    footnote="Précisez « NOBILIS » lors du dépôt, puis envoyez la capture sur WhatsApp pour une activation immédiate.",
+                )
+            )
+        else:
+            amount = "3 000 000" if plan == "ELITE" else "2 000 000"
+            body = (
+                tpl.paragraph(tpl.ENTERPRISE, f"<strong>{clean_name}</strong>, votre abonnement <strong>NOBILIS {plan}</strong> a expiré.")
+                + tpl.paragraph(tpl.ENTERPRISE, "Vos rapports sont suspendus et vous ne recevrez plus d'opportunités tant que le renouvellement n'est pas effectué.")
+                + tpl.action_box(
+                    tpl.ENTERPRISE,
+                    heading="Renouveler pour 1 an",
+                    intro="Effectuez un dépôt Orange Money de",
+                    amount=amount,
+                    footnote="Envoyez ensuite la capture sur WhatsApp : votre compte est réactivé dans la foulée, sans perte de configuration.",
+                )
+                + tpl.info_box(tpl.ENTERPRISE, "Votre profil, vos secteurs et vos critères sont conservés. Le renouvellement les réactive à l'identique.")
+            )
+
+        html_body = tpl.render(
+            tpl.ENTERPRISE,
+            heading="Votre accès est suspendu",
+            body_html=body,
+            preheader="Vos rapports NOBILIS X sont suspendus. Voici comment les réactiver.",
+        )
+        return self._dispatch(enterprise, subject, html_body)
+
+    def send_renewal_confirmation(self, enterprise: Enterprise) -> bool:
+        """Confirme un renouvellement ou un retablissement (compte deja existant)."""
+        if not enterprise.email:
+            return False
+
+        plan = plan_base(enterprise)
+        clean_name = self._clean_text(enterprise.name)
+        expires = getattr(enterprise, "subscription_expires_at", None)
+        expires_str = expires.strftime("%d/%m/%Y") if expires else "dans 1 an"
+        cadence = "chaque matin à 7h" if plan == "ELITE" else "chaque lundi à 8h"
+
+        subject = f"NOBILIS X - Abonnement renouvelé, {enterprise.name}"
+
+        body = (
+            tpl.paragraph(tpl.ENTERPRISE, f"<strong>Merci {clean_name}.</strong> Votre paiement a été confirmé et votre abonnement <strong>NOBILIS {plan}</strong> est de nouveau actif.")
+            + tpl.paragraph(tpl.ENTERPRISE, f"Vos rapports reprennent <strong>{cadence}</strong>, avec votre profil et vos critères inchangés.")
+            + tpl.info_box(tpl.ENTERPRISE, f"Votre abonnement est valable jusqu'au <strong>{expires_str}</strong>. Nous vous préviendrons 7 jours puis 3 jours avant l'échéance.")
+        )
+
+        if plan == "ELITE":
+            body += tpl.paragraph(
+                tpl.ENTERPRISE,
+                "En tant qu'abonné ELITE, vous recevez aussi les <strong>alertes immédiates</strong> "
+                "à 8h45 et 18h45 dès qu'une opportunité à fort potentiel est détectée.",
+            )
+
+        html_body = tpl.render(
+            tpl.ENTERPRISE,
+            heading="Abonnement réactivé",
+            body_html=body,
+            preheader=f"Votre abonnement NOBILIS {plan} est actif jusqu'au {expires_str}.",
+        )
+        return self._dispatch(enterprise, subject, html_body)
 
     def send_welcome_email(self, enterprise: Enterprise) -> bool:
         if not enterprise.email:
@@ -382,11 +551,31 @@ class EmailService:
             self.db.commit()
             return False
 
-    def send_all_daily_reports(self) -> dict:
-        from datetime import timedelta
+    def send_all_daily_reports(self, elite_only: bool | None = None, only_if_new: bool = False) -> dict:
+        """Envoie le rapport aux entreprises eligibles.
+
+        elite_only=None  : toutes les entreprises actives (cycle hebdomadaire du lundi)
+        elite_only=True  : uniquement les ELITE (rapport quotidien de 7h)
+        elite_only=False : uniquement les non-ELITE (PASS et ENTRY)
+
+        only_if_new=True : n'envoie qu'aux entreprises dont le classement contient
+        au moins une opportunite parue dans les dernieres 24h. Evite d'expedier
+        chaque matin le meme top 10 aux abonnes ELITE.
+        """
         from app.services.scorer import ScorerService
         from app.services.ai_analyzer import AIAnalyzerService
         from app.services.report_generator import ReportGeneratorService
+
+        recent_ids: set[int] = set()
+        if only_if_new:
+            cutoff = datetime.utcnow() - timedelta(hours=24)
+            recent_ids = {
+                row[0]
+                for row in self.db.query(Tender.id).filter(Tender.created_at >= cutoff).all()
+            }
+            if not recent_ids:
+                logger.info("Aucune nouvelle opportunité depuis 24h — rapport quotidien ELITE ignoré")
+                return {"sent": 0, "failed": 0, "skipped": 0}
 
         enterprises = self.db.query(Enterprise).filter(Enterprise.email.isnot(None)).all()
         scorer = ScorerService(self.db)
@@ -397,24 +586,32 @@ class EmailService:
 
         for enterprise in enterprises:
             try:
-                # Bloquer les envois aux comptes en attente de paiement
-                plan = getattr(enterprise, 'subscription_plan', 'PASS') or 'PASS'
-                
-                if plan.upper().startswith("PENDING_") or plan.upper().startswith("SUSPENDED_"):
-                    logger.info(f"Rapport ignori pour {enterprise.name} ({plan}) — en attente ou bloque")
+                plan = plan_base(enterprise)
+
+                # Comptes en attente de paiement, suspendus ou expirés : pas de rapport
+                if not is_active(enterprise):
+                    logger.info(
+                        f"Rapport ignoré pour {enterprise.name} : "
+                        f"{blocked_reason(enterprise)}"
+                    )
                     results["skipped"] += 1
                     continue
-                
-                # Bloquer les PASS expirés (essai de 1 semaine)
-                if plan.upper() == "PASS":
-                    from datetime import datetime as dt
-                    if dt.utcnow() > enterprise.created_at + timedelta(days=7):
-                        logger.info(f"PASS expire pour {enterprise.name} — rapport ignore")
-                        results["skipped"] += 1
-                        continue
+
+                # Les ELITE reçoivent leur rapport quotidiennement (job dédié à 7h),
+                # on évite de leur envoyer un doublon le lundi.
+                if elite_only is not None and is_elite(enterprise) != elite_only:
+                    results["skipped"] += 1
+                    continue
 
                 scored = scorer.score_all_for_enterprise(enterprise)
                 if not scored:
+                    results["skipped"] += 1
+                    continue
+
+                # Rapport quotidien ELITE : rien de neuf pour cette entreprise,
+                # on ne lui renvoie pas le classement de la veille.
+                if only_if_new and not any(item["tender_id"] in recent_ids for item in scored[:10]):
+                    logger.info(f"Aucune nouveauté pour {enterprise.name} — rapport quotidien ignoré")
                     results["skipped"] += 1
                     continue
 

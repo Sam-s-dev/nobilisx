@@ -15,7 +15,7 @@ from app.models.email_log import EmailLog
 from app.services.email_service import EmailService
 from app.services.email_service_individual import IndividualEmailService
 from app.config import get_settings
-from app.tasks import send_welcome_email_task
+from app.tasks import send_renewal_confirmation_task, send_welcome_email_task
 
 from app.limiter import limiter
 from app.config import get_settings
@@ -132,10 +132,14 @@ def validate_user_payment(
     # Retirer les préfixes de blocage
     old_plan = user.subscription_plan
     new_plan = old_plan.replace("PENDING_", "").replace("SUSPENDED_", "")
-    
+
     if old_plan == new_plan and new_plan != "PASS":
         return {"message": "L'utilisateur est déjà actif.", "plan": new_plan}
-        
+
+    # Première activation (PENDING_) ou remise en service d'un compte existant
+    # (SUSPENDED_) : le message envoyé au client n'est pas le même.
+    is_first_activation = old_plan.startswith("PENDING_")
+
     user.subscription_plan = new_plan
     
     # Extension de l'abonnement (1 an / 365 jours)
@@ -152,13 +156,22 @@ def validate_user_payment(
     
     logger.info(f"✅ Compte activé/rétabli pour {email} ({user_type}). Plan: {new_plan}. Expire: {user.subscription_expires_at}")
     
-    # Envoyer l'email de bienvenue/confirmation en arrière-plan
-    background_tasks.add_task(send_welcome_email_task, user.id, user_type)
-        
+    # Bienvenue pour une première activation, confirmation de renouvellement
+    # pour un compte qui existait déjà (un client fidèle ne doit pas recevoir
+    # « Bienvenue sur NOBILIS X » à sa deuxième année).
+    if is_first_activation:
+        background_tasks.add_task(send_welcome_email_task, user.id, user_type)
+        email_kind = "bienvenue"
+    else:
+        background_tasks.add_task(send_renewal_confirmation_task, user.id, user_type)
+        email_kind = "renouvellement"
+
     return {
         "status": "success",
         "message": f"Utilisateur {email} prêt sur le plan {new_plan}.",
-        "email_queued": True
+        "email_queued": True,
+        "email_kind": email_kind,
+        "expires_at": user.subscription_expires_at.isoformat() if user.subscription_expires_at else None,
     }
 
 @router.post("/suspend")

@@ -17,7 +17,7 @@ from app.models.enterprise import Enterprise
 from app.schemas.enterprise import EnterpriseCreate, EnterpriseResponse, EnterpriseUpdate
 from app.services.email_service import EmailService
 from app.models.subscription import SUBSCRIPTION_PLANS
-from app.tasks import send_welcome_email_task
+from app.tasks import send_admin_registration_alert_task, send_welcome_email_task
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +91,9 @@ def create_enterprise(
     db.commit()
     db.refresh(enterprise)
     logger.info(f"Entreprise creee: {enterprise.name} (id={enterprise.id}, plan={data['subscription_plan']}, expires={data['subscription_expires_at']})")
-    # Envoi de l'email de bienvenue en arrière-plan
+    # Envois en arrière-plan : bienvenue au client, alerte à l'admin
     background_tasks.add_task(send_welcome_email_task, enterprise.id, "enterprise")
+    background_tasks.add_task(send_admin_registration_alert_task, enterprise.id, "enterprise")
     return enterprise
 
 

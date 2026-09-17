@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     # Expéditeur commun à tous les fournisseurs (défaut : SMTP_FROM).
     EMAIL_FROM: str = ""
     EMAIL_FROM_NAME: str = "NOBILIS X"
+    # Destinataire des alertes internes (nouvelles inscriptions).
+    # Vide = retombe sur EMAIL_FROM, puis CONTACT_EMAIL.
+    ADMIN_ALERT_EMAIL: str = ""
     # "auto" = cascade automatique. Sinon : brevo | smtp2go | resend | mailjet | smtp
     EMAIL_PROVIDER: str = "auto"
     # Ordre personnalisé, ex: "resend,brevo,smtp". Vide = ordre par défaut.

@@ -1,9 +1,16 @@
 # app/scheduler/jobs.py
 """
 Scheduler APScheduler - NOBILIS X V2
-- Samedi 22h30 : Collecte des appels d'offres (Scraping discret)
-- Lundi 7h : Analyse IA + Scoring + Envoi des rapports hebdomadaires (Bi-segment)
-- Toutes les 2h (8h-20h) : Alertes temps réel pour ELITE (Entreprises)
+- Samedi (SCRAPE_SCHEDULE_HOUR) : collecte des appels d'offres et missions
+- Lundi (EMAIL_SCHEDULE_HOUR)    : analyse IA + rapports PASS et ENTRY
+- Tous les jours 7h              : rapport quotidien ELITE, si nouveautes
+- 8h45 et 18h45                  : alertes ELITE temps reel (score >= 70)
+- Toutes les 2h                  : suspension des abonnements expires + avis
+- Tous les jours 9h              : rappels d'expiration (J-7 et J-3)
+
+Difference commerciale ENTRY / ELITE :
+    ENTRY -> veille hebdomadaire
+    ELITE -> veille quotidienne + alertes immediates
 """
 
 import logging
@@ -76,58 +83,118 @@ def job_weekly_cycle():
             analyses = analyzer.analyze_all_pending()
             logger.info(f"{len(analyses)} nouvelles analyses générées.")
 
-            # Étape 2 : Rapports Entreprises
-            logger.info("Étape 2/3 : Rapports hebdomadaires ENTREPRISES...")
+            # Étape 2 : Rapports Entreprises (PASS et ENTRY uniquement —
+            # les ELITE ont déjà reçu leur rapport quotidien à 7h)
+            logger.info("Étape 2/3 : Rapports hebdomadaires ENTREPRISES (hors ELITE)...")
             email_service = EmailService(db)
-            res_ent = email_service.send_all_daily_reports()
+            res_ent = email_service.send_all_daily_reports(elite_only=False)
             logger.info(f"Resultats Entreprises : {res_ent}")
 
-            # Étape 3 : Rapports Particuliers
-            logger.info("Étape 3/3 : Rapports hebdomadaires PARTICULIERS...")
+            # Étape 3 : Rapports Particuliers (idem, hors ELITE)
+            logger.info("Étape 3/3 : Rapports hebdomadaires PARTICULIERS (hors ELITE)...")
             indiv_email_service = IndividualEmailService(db)
-            res_indiv = indiv_email_service.send_all_individual_reports()
+            res_indiv = indiv_email_service.send_all_individual_reports(elite_only=False)
             logger.info(f"Resultats Particuliers : {res_indiv}")
 
     except Exception as e:
         logger.error(f"ERREUR CYCLE LUNDI: {e}", exc_info=True)
 
 
+def job_daily_elite_reports():
+    """
+    Rapport QUOTIDIEN des abonnés ELITE (7h) — entreprises et particuliers.
+
+    C'est ce qui distingue ELITE d'ENTRY : veille quotidienne contre veille
+    hebdomadaire. Le rapport n'est envoyé qu'aux abonnés dont le classement
+    contient au moins une opportunité parue dans les dernières 24h, pour ne
+    jamais réexpédier le même top 10 deux matins de suite.
+    """
+    logger.info("=" * 60)
+    logger.info(f"NOBILIS X — RAPPORT QUOTIDIEN ELITE | {datetime.now().isoformat()}")
+    logger.info("=" * 60)
+
+    try:
+        with get_db_context() as db:
+            # Analyser d'abord ce que la veille temps réel a collecté cette nuit
+            analyzer = AIAnalyzerService(db)
+            analyzer.analyze_all_pending()
+
+            res_ent = EmailService(db).send_all_daily_reports(elite_only=True, only_if_new=True)
+            logger.info(f"ELITE quotidien — Entreprises : {res_ent}")
+
+            res_ind = IndividualEmailService(db).send_all_individual_reports(
+                elite_only=True, only_if_new=True
+            )
+            logger.info(f"ELITE quotidien — Particuliers : {res_ind}")
+
+    except Exception as e:
+        logger.error(f"ERREUR RAPPORT QUOTIDIEN ELITE: {e}", exc_info=True)
+
+
 def job_elite_realtime_alert():
     """
-    Job ELITE temps réel — Toutes les 2h (Entreprises uniquement).
+    Alerte ELITE temps réel — 8h45 et 18h45, entreprises ET particuliers.
+
+    Ne part que sur les opportunités à fort score (>= 70) et uniquement si la
+    collecte forcée a trouvé du nouveau. Utilise un template dédié, distinct du
+    rapport périodique, pour que l'abonné voie ce que son plan lui apporte.
     """
     logger.info("=" * 60)
     logger.info(f"NOBILIS X — ALERTE ELITE TEMPS RÉEL | {datetime.now().isoformat()}")
     logger.info("=" * 60)
 
+    ALERT_THRESHOLD = 70
+
     try:
         with get_db_context() as db:
             from app.models.enterprise import Enterprise
+            from app.models.individual import Individual
             from app.services.scorer import ScorerService
+            from app.services.scorer_individual import IndividualScorerService
+            from app.services.subscription import is_active
 
-            # Scraping forcé mais discret
-            scraper = ScraperService(db)
-            new_tenders = scraper.scrape_tenders(force=True)
-            
+            # Collecte forcée mais discrète
+            new_tenders = ScraperService(db).scrape_tenders(force=True)
             if not new_tenders:
-                logger.info("ELITE RT: Aucun nouveau tender détecté.")
+                logger.info("ELITE RT : aucune nouvelle opportunité détectée.")
                 return
 
-            # Analyse IA immédiate
-            analyzer = AIAnalyzerService(db)
-            analyzer.analyze_all_pending()
+            # Analyse IA immédiate des nouveautés
+            AIAnalyzerService(db).analyze_all_pending()
 
-            # Ciblage ELITE
-            elite_clients = db.query(Enterprise).filter(Enterprise.subscription_plan == "ELITE").all()
-            if not elite_clients: return
+            new_ids = {t.id for t in new_tenders if getattr(t, "id", None)}
+            sent = 0
 
+            # ── Entreprises ELITE ──
             scorer = ScorerService(db)
             email_service = EmailService(db)
-            for client in elite_clients:
+            for client in db.query(Enterprise).filter(Enterprise.subscription_plan == "ELITE").all():
+                if not is_active(client):
+                    continue
                 scored = scorer.score_all_for_enterprise(client)
-                top = [s for s in scored if s["score"] >= 70]
-                if top:
-                    email_service.send_daily_report(client, top[:5])
+                # Uniquement les nouveautés de ce passage, au-dessus du seuil
+                top = [
+                    s for s in scored
+                    if s["score"] >= ALERT_THRESHOLD and (not new_ids or s["tender_id"] in new_ids)
+                ]
+                if top and email_service.send_elite_alert(client, top[:5]):
+                    sent += 1
+
+            # ── Particuliers ELITE ──
+            indiv_scorer = IndividualScorerService(db)
+            indiv_service = IndividualEmailService(db)
+            for client in db.query(Individual).filter(Individual.subscription_plan == "ELITE").all():
+                if not is_active(client):
+                    continue
+                scored = indiv_scorer.score_all_for_individual(client)
+                top = [
+                    s for s in scored
+                    if s["score"] >= ALERT_THRESHOLD and (not new_ids or s["tender_id"] in new_ids)
+                ]
+                if top and indiv_service.send_elite_alert(client, top[:5]):
+                    sent += 1
+
+            logger.info(f"ELITE RT : {sent} alerte(s) envoyée(s).")
 
     except Exception as e:
         logger.error(f"ERREUR ALERTE ELITE: {e}", exc_info=True)
@@ -135,10 +202,12 @@ def job_elite_realtime_alert():
 
 def job_check_expirations():
     """
-    L'Horloge Nobilis : Vérifie les expirations toutes les 2 heures.
-    - PASS : 48h (2 jours)
+    L'Horloge Nobilis : vérifie les expirations toutes les 2 heures.
+    - PASS : 7 jours d'essai (voir app/services/subscription.PASS_TRIAL_DAYS)
     - ENTRY/ELITE : 1 an (365 jours)
-    Bloque l'envoi des rapports si expiré.
+
+    Suspend les comptes expirés ET prévient le client par email. Sans cet envoi,
+    l'abonné voyait ses rapports s'arrêter sans explication ni moyen de réagir.
     """
     logger.info("🕒 NOBILIS X — VERIFICATION DES EXPIRATIONS...")
     try:
@@ -154,8 +223,7 @@ def job_check_expirations():
             ).all()
 
             for ent in expired_ent:
-                old_plan = ent.subscription_plan
-                ent.subscription_plan = f"SUSPENDED_{old_plan}"
+                ent.subscription_plan = f"SUSPENDED_{ent.subscription_plan}"
                 logger.warning(f"🚫 Compte Entreprise SUSPENDU (Expiré) : {ent.name} (Plan final: {ent.subscription_plan})")
 
             # 2. Individus
@@ -165,13 +233,34 @@ def job_check_expirations():
             ).all()
 
             for ind in expired_ind:
-                old_plan = ind.subscription_plan
-                ind.subscription_plan = f"SUSPENDED_{old_plan}"
+                ind.subscription_plan = f"SUSPENDED_{ind.subscription_plan}"
                 logger.warning(f"🚫 Compte Particulier SUSPENDU (Expiré) : {ind.full_name} (Plan final: {ind.subscription_plan})")
 
             db.commit()
+
+            # 3. Prévenir les clients concernés (après commit : le plan suspendu
+            #    doit être en base pour que l'email affiche le bon message).
+            if expired_ent:
+                email_service = EmailService(db)
+                for ent in expired_ent:
+                    try:
+                        email_service.send_expiration_notice(ent)
+                    except Exception as e:
+                        logger.error(f"Avis d'expiration non envoyé à {ent.email} : {e}")
+
+            if expired_ind:
+                indiv_service = IndividualEmailService(db)
+                for ind in expired_ind:
+                    try:
+                        indiv_service.send_expiration_notice(ind)
+                    except Exception as e:
+                        logger.error(f"Avis d'expiration non envoyé à {ind.email} : {e}")
+
             if expired_ent or expired_ind:
-                logger.info(f"✅ Total suspension effectuée : {len(expired_ent) + len(expired_ind)}")
+                logger.info(
+                    f"✅ Suspensions : {len(expired_ent) + len(expired_ind)} compte(s), "
+                    "avis d'expiration envoyés."
+                )
             else:
                 logger.info("✅ Aucun compte expiré détecté.")
 
@@ -260,7 +349,17 @@ def init_scheduler():
         misfire_grace_time=3600,
     )
 
-    # 3. ALERTES ELITE : 2 fois par jour (Matin 8h45 & Soir 18h45)
+    # 3. RAPPORT QUOTIDIEN ELITE : tous les matins à 7h (si nouveautés)
+    scheduler.add_job(
+        func=job_daily_elite_reports,
+        trigger=CronTrigger(hour=7, minute=0),
+        id="daily_elite_reports",
+        name="NOBILIS X — Rapport Quotidien ELITE",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
+    # 4. ALERTES ELITE : 2 fois par jour (Matin 8h45 & Soir 18h45)
     scheduler.add_job(
         func=job_elite_realtime_alert,
         trigger=CronTrigger(hour="8,18", minute=45),
@@ -270,7 +369,7 @@ def init_scheduler():
         misfire_grace_time=3600,
     )
 
-    # 4. HORLOGE NOBILIS : Toutes les 2 heures (pour être réactif sur l'essai de 48h)
+    # 5. HORLOGE NOBILIS : toutes les 2 heures (réactivité sur la fin d'essai)
     scheduler.add_job(
         func=job_check_expirations,
         trigger=CronTrigger(hour="*/2"),
@@ -280,7 +379,7 @@ def init_scheduler():
         misfire_grace_time=3600,
     )
 
-    # 5. RAPPELS D'EXPIRATION : Tous les jours à 9h00
+    # 6. RAPPELS D'EXPIRATION : Tous les jours à 9h00
     scheduler.add_job(
         func=job_daily_reminders,
         trigger=CronTrigger(hour=9, minute=0),

@@ -15,7 +15,7 @@ from app.database import get_db
 from app.models.individual import Individual
 from app.schemas.individual import IndividualCreate, IndividualResponse, IndividualUpdate
 from app.services.email_service_individual import IndividualEmailService
-from app.tasks import send_welcome_email_task
+from app.tasks import send_admin_registration_alert_task, send_welcome_email_task
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +87,9 @@ def create_individual(
         f"(id={individual.id}, plan={payload['subscription_plan']}, expires={payload['subscription_expires_at']})"
     )
 
-    # Envoi de l'email de bienvenue en arrière-plan
+    # Envois en arrière-plan : bienvenue au client, alerte à l'admin
     background_tasks.add_task(send_welcome_email_task, individual.id, "individual")
+    background_tasks.add_task(send_admin_registration_alert_task, individual.id, "individual")
 
     return individual
 

@@ -1,5 +1,22 @@
 # Configuration de l'envoi d'emails (production)
 
+## Ce que reçoit chaque client
+
+| Email | Déclencheur | Destinataire |
+|---|---|---|
+| Bienvenue / pré-inscription | Inscription | Client |
+| **Alerte nouvelle inscription** | Inscription | **Admin** (`ADMIN_ALERT_EMAIL`) |
+| Rapport périodique | Lundi 8h (PASS, ENTRY) — tous les jours 7h (ELITE, si nouveautés) | Client |
+| **Alerte ELITE temps réel** | 8h45 et 18h45, opportunités scorant ≥ 70 | Clients ELITE |
+| Rappel d'expiration | J-7 et J-3, 9h | Client |
+| **Avis d'expiration** | À la suspension du compte | Client |
+| **Confirmation de renouvellement** | Validation admin d'un compte existant | Client |
+
+Cadence commerciale : **ENTRY = veille hebdomadaire**, **ELITE = veille quotidienne + alertes immédiates**.
+L'essai **PASS dure 7 jours** (`app/services/subscription.py`, `PASS_TRIAL_DAYS`) — une seule constante,
+appliquée au site comme aux emails.
+
+
 ## Pourquoi ça marche en local mais pas une fois déployé
 
 En local, l'application envoie via **SMTP Gmail** (port 587). Sur Render, Railway

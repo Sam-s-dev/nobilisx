@@ -15,6 +15,7 @@ from app.schemas.analysis import AnalysisResponse, AnalysisDetailResponse
 from app.services.scorer import ScorerService
 from app.services.report_generator import ReportGeneratorService
 from app.services.email_service import EmailService
+from app.services.subscription import blocked_reason
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
@@ -44,13 +45,10 @@ def get_analysis_for_enterprise(
             detail=f"Entreprise #{enterprise_id} non trouvée",
         )
 
-    # Blocage de paiement (Essai PASS terminé)
-    if enterprise.subscription_plan == "PASS":
-        if datetime.utcnow() > enterprise.created_at + timedelta(days=2):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Période d'essai terminée. Veuillez effectuer le paiement pour réactiver votre compte.",
-            )
+    # Blocage si l'abonnement n'est pas actif (essai terminé, paiement en attente, suspension)
+    reason = blocked_reason(enterprise)
+    if reason:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=reason)
 
     scorer = ScorerService(db)
     scored = scorer.score_all_for_enterprise(enterprise)
@@ -173,12 +171,10 @@ def run_test_cycle_for_enterprise(enterprise_id: int, db: Session = Depends(get_
     if not enterprise.email:
         raise HTTPException(status_code=400, detail="Aucun email configuré pour cette entreprise")
 
-    # Bloquer si abonnement expiré
-    if enterprise.subscription_plan == "PASS" and datetime.utcnow() > enterprise.created_at + timedelta(days=2):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Période d'essai terminée. Veuillez effectuer le paiement via Orange Money (+224 627 27 13 97).",
-        )
+    # Bloquer si l'abonnement n'est pas actif
+    reason = blocked_reason(enterprise)
+    if reason:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=reason)
 
     steps_log = []
 
