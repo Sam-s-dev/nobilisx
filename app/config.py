@@ -43,7 +43,16 @@ class Settings(BaseSettings):
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
 
-    # --- SMTP / Mailjet ---
+    # --- Envoi d'emails ---
+    # Expéditeur commun à tous les fournisseurs (défaut : SMTP_FROM).
+    EMAIL_FROM: str = ""
+    EMAIL_FROM_NAME: str = "NOBILIS X"
+    # "auto" = cascade automatique. Sinon : brevo | smtp2go | resend | mailjet | smtp
+    EMAIL_PROVIDER: str = "auto"
+    # Ordre personnalisé, ex: "resend,brevo,smtp". Vide = ordre par défaut.
+    EMAIL_PROVIDER_ORDER: str = ""
+
+    # --- SMTP standard (fonctionne en local, bloqué sur Render/Railway) ---
     SMTP_HOST: str = "in-v3.mailjet.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
@@ -54,6 +63,19 @@ class Settings(BaseSettings):
     # --- Mailjet HTTP API (pour hébergement cloud où SMTP est bloqué) ---
     MAILJET_API_KEY: str = ""
     MAILJET_SECRET_KEY: str = ""
+
+    # --- Brevo (ex-Sendinblue) HTTP API — 300 mails/jour, aucun domaine requis ---
+    BREVO_API_KEY: str = ""
+
+    # --- SMTP2GO HTTP API — 1000 mails/mois, aucun domaine requis ---
+    SMTP2GO_API_KEY: str = ""
+    SMTP2GO_FROM: str = ""
+
+    # --- Resend HTTP API — 3000 mails/mois, NÉCESSITE un domaine vérifié ---
+    RESEND_API_KEY: str = ""
+    # Adresse sur un domaine vérifié chez Resend (ex: contact@mondomaine.com).
+    # Sans cela, Resend ne peut écrire qu'au propriétaire du compte.
+    RESEND_FROM: str = ""
 
     # --- Scraping ---
     TELEMO_BASE_URL: str = "https://telemo.gov.gn"

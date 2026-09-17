@@ -240,47 +240,68 @@ def test_email(
     password: str,
     db: Session = Depends(get_db)
 ):
-    """Endpoint diagnostic pour tester l'envoi d'e-mail."""
+    """Envoie un e-mail de test et rapporte le fournisseur utilisé + l'erreur exacte."""
     if password.strip() != settings.ADMIN_PASSWORD.strip():
         raise HTTPException(status_code=401, detail="Mot de passe incorrect")
-        
-    from app.services.email_service import EmailService
+
     from fastapi.responses import JSONResponse
-    
-    # Diagnostic de la méthode d'envoi
-    has_mailjet_api = bool(settings.MAILJET_API_KEY and settings.MAILJET_SECRET_KEY)
-    method = "Mailjet HTTP API (HTTPS)" if has_mailjet_api else f"SMTP ({settings.SMTP_HOST}:{settings.SMTP_PORT})"
-    
-    service = EmailService(db)
+    from app.services.email_sender import describe_config, send_email
+
+    config = describe_config()
     subject = "NOBILIS X - Test Diagnostic"
     html_body = f"""<h1 style="color:#c9a84c;">NOBILIS X — Test Réussi ✅</h1>
     <p>Si vous recevez ce message, votre configuration email est 100% correcte.</p>
-    <p><strong>Méthode utilisée :</strong> {method}</p>
-    <p><strong>Expéditeur :</strong> {settings.SMTP_FROM}</p>"""
-    
+    <p><strong>Expéditeur :</strong> {config['from_email']}</p>
+    <p><strong>Ordre des fournisseurs :</strong> {', '.join(config['order'])}</p>"""
+
     try:
-        service._send_mailjet_http(email, subject, html_body)
+        result = send_email(
+            to_email=email,
+            subject=subject,
+            html_body=html_body,
+            text_body="NOBILIS X - Test reussi. Votre configuration email est correcte.",
+        )
         return {
             "status": "success",
             "message": f"E-mail de test envoyé avec succès à {email}.",
-            "method": method,
-            "mailjet_api_configured": has_mailjet_api,
+            "provider_used": result["provider"],
+            "message_id": result["message_id"],
+            "attempts": result["attempts"],
+            "config": config,
         }
     except Exception as e:
         logger.error(f"❌ Échec de l'envoi de test : {e}", exc_info=True)
-        import traceback
         return JSONResponse(
             status_code=500,
             content={
                 "status": "failed",
                 "message": "L'envoi de l'e-mail a échoué.",
-                "method_attempted": method,
-                "mailjet_api_configured": has_mailjet_api,
                 "error": str(e),
-                "suggestion": "Configurez MAILJET_API_KEY et MAILJET_SECRET_KEY si SMTP est bloqué" if not has_mailjet_api else "Vérifiez vos clés API Mailjet",
-                "traceback": traceback.format_exc()
+                "config": config,
+                "suggestion": (
+                    config["warnings"][0] if config["warnings"]
+                    else "Consultez 'error' : le message contient la réponse exacte de l'API."
+                ),
             }
         )
+
+
+@router.get("/email_config")
+def email_config(
+    password: Optional[str] = Query(None),
+    x_admin_password: Optional[str] = Header(None, alias="X-Admin-Password")
+):
+    """État de la configuration email, sans envoyer de mail.
+
+    Permet de vérifier depuis Render quel fournisseur sera réellement utilisé
+    et quelles variables d'environnement manquent.
+    """
+    provided = (password or x_admin_password or "").strip()
+    if not provided or provided != settings.ADMIN_PASSWORD.strip():
+        raise HTTPException(status_code=401, detail="Mot de passe admin incorrect.")
+
+    from app.services.email_sender import describe_config
+    return describe_config()
 
 @router.get("/email_logs")
 def list_email_logs(
