@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     # Destinataire des alertes internes (nouvelles inscriptions).
     # Vide = retombe sur EMAIL_FROM, puis CONTACT_EMAIL.
     ADMIN_ALERT_EMAIL: str = ""
+    # URL publique du site, utilisée pour le logo affiché dans les emails.
+    # Les clients mail bloquent les images jointes : elles doivent être en HTTPS.
+    PUBLIC_BASE_URL: str = "https://nobilisx.onrender.com"
     # "auto" = cascade automatique. Sinon : brevo | smtp2go | resend | mailjet | smtp
     EMAIL_PROVIDER: str = "auto"
     # Ordre personnalisé, ex: "resend,brevo,smtp". Vide = ordre par défaut.

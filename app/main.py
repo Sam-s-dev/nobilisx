@@ -5,6 +5,7 @@ L'intelligence des marchés. La noblesse de l'avance.
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -171,6 +172,33 @@ app.include_router(analyses.router, prefix="/api/v1")
 app.include_router(individuals.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
+
+
+# === PWA : fichiers servis depuis la racine ===
+# Un service worker ne peut contrôler que les URLs situées sous son propre
+# chemin. Servi depuis /static/, il ne couvrirait pas la page d'accueil et
+# l'application ne serait pas installable : on l'expose donc aussi à la racine.
+
+@app.get("/sw.js", include_in_schema=False)
+def service_worker():
+    return FileResponse(
+        os.path.join("app", "static", "sw.js"),
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def manifest():
+    return FileResponse(
+        os.path.join("app", "static", "manifest.webmanifest"),
+        media_type="application/manifest+json",
+    )
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse(os.path.join("app", "static", "icons", "favicon.ico"))
 
 
 # === Endpoints utilitaires ===

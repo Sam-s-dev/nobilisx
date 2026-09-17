@@ -17,6 +17,20 @@ ORANGE_MONEY_NUMBER = "+224 627 27 13 97"
 WHATSAPP_URL = "https://wa.me/224627271397"
 SUPPORT_EMAIL = "trillionnx@gmail.com"
 
+# Les clients mail ne chargent que des images distantes : une image jointe ou
+# en data: URI est bloquee par Gmail et Outlook. Le logo doit donc etre servi
+# par le site en HTTPS. PUBLIC_BASE_URL permet de pointer ailleurs (test local).
+DEFAULT_SITE_URL = "https://nobilisx.onrender.com"
+
+
+def site_url() -> str:
+    from app.config import get_settings
+    return (getattr(get_settings(), "PUBLIC_BASE_URL", "") or DEFAULT_SITE_URL).rstrip("/")
+
+
+def logo_url() -> str:
+    return f"{site_url()}/static/icons/icon-192.png"
+
 
 @dataclass(frozen=True)
 class Palette:
@@ -105,8 +119,16 @@ def render(palette: Palette, heading: str, body_html: str,
 <body style="margin:0;padding:20px;background:{palette.page_bg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
 {preheader_block}
 <div style="max-width:520px;margin:0 auto;background:{palette.card_bg};padding:40px 32px;border-radius:18px;border:1px solid {palette.border};">
-    <h1 style="color:{palette.accent};font-size:27px;margin:0 0 4px 0;font-weight:900;letter-spacing:-0.5px;">NOBILIS X</h1>
-    <p style="color:{palette.muted};font-size:11px;margin:0 0 26px 0;letter-spacing:1.5px;font-weight:600;">{palette.tagline}</p>
+    <table cellpadding="0" cellspacing="0" style="margin:0 0 22px 0;"><tr>
+      <td style="vertical-align:middle;padding-right:12px;">
+        <img src="{logo_url()}" width="48" height="48" alt="NobilisX"
+             style="display:block;width:48px;height:48px;border-radius:12px;background:#ffffff;">
+      </td>
+      <td style="vertical-align:middle;">
+        <div style="color:{palette.accent};font-size:24px;font-weight:900;letter-spacing:-0.5px;line-height:1.1;">NOBILIS X</div>
+        <div style="color:{palette.muted};font-size:10px;letter-spacing:1.5px;font-weight:600;margin-top:3px;">{palette.tagline}</div>
+      </td>
+    </tr></table>
     <h2 style="color:{palette.title};font-size:20px;font-weight:800;margin:0 0 14px 0;">{heading}</h2>
     {body_html}
     <hr style="border:none;border-top:1px solid {palette.border};margin:26px 0 18px 0;">

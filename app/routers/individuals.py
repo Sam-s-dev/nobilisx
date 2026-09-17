@@ -15,6 +15,7 @@ from app.database import get_db
 from app.models.individual import Individual
 from app.schemas.individual import IndividualCreate, IndividualResponse, IndividualUpdate
 from app.services.email_service_individual import IndividualEmailService
+from app.services.subscription import PAID_PLAN_DAYS, PASS_TRIAL_DAYS, email_already_used
 from app.tasks import send_admin_registration_alert_task, send_welcome_email_task
 
 logger = logging.getLogger(__name__)
@@ -56,15 +57,21 @@ def create_individual(
     # Gestion du statut en attente pour les plans payants
     client_plan = (payload.get("subscription_plan") or "PASS").upper()
     
+    # Normalisation de l'email (voir enterprises.py : la casse permettait
+    # sinon de réutiliser l'essai gratuit autant de fois que voulu).
+    if payload.get("email"):
+        payload["email"] = payload["email"].strip().lower()
+
     if client_plan == "PASS":
-        # Vérifier si l'email a déjà été utilisé pour un compte (Entreprise ou Particulier)
-        from app.models.enterprise import Enterprise
-        already_ind = db.query(Individual).filter(Individual.email == payload["email"]).first()
-        already_ent = db.query(Enterprise).filter(Enterprise.email == payload["email"]).first()
-        if already_ind or already_ent:
+        # Un email ne peut bénéficier de l'essai gratuit qu'une seule fois,
+        # tous segments confondus (entreprise ou particulier).
+        if payload.get("email") and email_already_used(db, payload["email"]):
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, 
-                detail="Cet email a déjà bénéficié d'un essai gratuit ou d'un compte existant."
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "Cet email a déjà bénéficié de l'essai gratuit. "
+                    "Choisis le plan NOBILIS ENTRY ou ELITE pour continuer."
+                ),
             )
         payload["subscription_plan"] = "PASS"
     elif client_plan in ["ENTRY", "ELITE"]:
@@ -74,7 +81,7 @@ def create_individual(
 
     # ── Calcul de l'expiration Nobilis ──
     client_plan_clean = client_plan.replace("PENDING_", "")
-    duration = 7 if client_plan_clean == "PASS" else 365
+    duration = PASS_TRIAL_DAYS if client_plan_clean == "PASS" else PAID_PLAN_DAYS
     payload["subscription_expires_at"] = datetime.utcnow() + timedelta(days=duration)
 
     individual = Individual(**payload)

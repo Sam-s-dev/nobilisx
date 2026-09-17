@@ -27,6 +27,36 @@ PENDING_PREFIX = "PENDING_"
 SUSPENDED_PREFIX = "SUSPENDED_"
 
 
+def email_already_used(db, email: str) -> bool:
+    """True si cet email a deja un compte, entreprise ou particulier.
+
+    Sert a garantir qu'un essai gratuit n'est accorde qu'une fois par adresse.
+    La comparaison ignore la casse : sans cela, « Test@Gmail.com » et
+    « test@gmail.com » seraient deux comptes distincts et l'essai pourrait etre
+    repris indefiniment.
+    """
+    if not email:
+        return False
+
+    from sqlalchemy import func
+
+    from app.models.enterprise import Enterprise
+    from app.models.individual import Individual
+
+    normalized = email.strip().lower()
+
+    found_ent = db.query(Enterprise.id).filter(
+        func.lower(func.trim(Enterprise.email)) == normalized
+    ).first()
+    if found_ent:
+        return True
+
+    found_ind = db.query(Individual.id).filter(
+        func.lower(func.trim(Individual.email)) == normalized
+    ).first()
+    return bool(found_ind)
+
+
 def raw_plan(user) -> str:
     """Plan tel qu'il est stocke, prefixes compris."""
     return (getattr(user, "subscription_plan", None) or "PASS").upper()

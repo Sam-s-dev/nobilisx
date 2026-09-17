@@ -17,6 +17,7 @@ from app.models.enterprise import Enterprise
 from app.schemas.enterprise import EnterpriseCreate, EnterpriseResponse, EnterpriseUpdate
 from app.services.email_service import EmailService
 from app.models.subscription import SUBSCRIPTION_PLANS
+from app.services.subscription import PAID_PLAN_DAYS, PASS_TRIAL_DAYS, email_already_used
 from app.tasks import send_admin_registration_alert_task, send_welcome_email_task
 
 logger = logging.getLogger(__name__)
@@ -65,15 +66,22 @@ def create_enterprise(
     # Gestion du statut en attente pour les plans payants
     client_plan = (enterprise_data.subscription_plan or "PASS").upper()
     
+    # Normalisation de l'email : sans cela, « Test@Gmail.com » et
+    # « test@gmail.com » comptent pour deux comptes distincts en PostgreSQL et
+    # l'essai gratuit peut être réutilisé indéfiniment en changeant la casse.
+    if data.get("email"):
+        data["email"] = data["email"].strip().lower()
+
     if client_plan == "PASS":
-        # Vérifier si l'email a déjà été utilisé pour un compte (Entreprise ou Particulier)
-        from app.models.individual import Individual
-        already_ent = db.query(Enterprise).filter(Enterprise.email == enterprise_data.email).first()
-        already_ind = db.query(Individual).filter(Individual.email == enterprise_data.email).first()
-        if already_ent or already_ind:
+        # Un email ne peut bénéficier de l'essai gratuit qu'une seule fois,
+        # tous segments confondus (entreprise ou particulier).
+        if data.get("email") and email_already_used(db, data["email"]):
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, 
-                detail="Cet email a déjà bénéficié d'un essai gratuit ou d'un compte existant."
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "Cet email a déjà bénéficié de l'essai gratuit. "
+                    "Choisissez le plan NOBILIS ENTRY ou ELITE pour continuer."
+                ),
             )
         data["subscription_plan"] = "PASS"
     elif client_plan in ["ENTRY", "ELITE"]:
@@ -83,7 +91,7 @@ def create_enterprise(
 
     # ── Calcul de l'expiration Nobilis ──
     client_plan_clean = client_plan.replace("PENDING_", "")
-    duration = 7 if client_plan_clean == "PASS" else 365
+    duration = PASS_TRIAL_DAYS if client_plan_clean == "PASS" else PAID_PLAN_DAYS
     data["subscription_expires_at"] = datetime.utcnow() + timedelta(days=duration)
 
     enterprise = Enterprise(**data)

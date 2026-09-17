@@ -35,6 +35,7 @@ from app.services.subscription import (
     blocked_reason,
     is_active,
     is_elite,
+    is_pending,
     plan_base,
 )
 
@@ -293,72 +294,119 @@ class IndividualEmailService:
     #  Email de bienvenue — Particulier
     # ------------------------------------------------------------------
 
+    # Ce que chaque plan apporte reellement, aligne sur le scheduler.
+    PLAN_DETAILS = {
+        "PASS": {
+            "cadence": "chaque lundi à 8h",
+            "avantages": [
+                f"Tes missions sélectionnées <strong>chaque lundi à 8h</strong>, pendant {PASS_TRIAL_DAYS} jours",
+                "Les <strong>5 meilleures missions</strong> 100% en ligne pour ton domaine",
+                "Un score de compatibilité sur 100 pour chacune",
+                "2 conseils IA pour booster ton profil",
+            ],
+        },
+        "ENTRY": {
+            "cadence": "chaque lundi à 8h",
+            "avantages": [
+                "Tes missions sélectionnées <strong>chaque lundi à 8h</strong>",
+                "Les <strong>5 meilleures missions</strong> 100% en ligne pour ton domaine",
+                "Un score de compatibilité sur 100 pour chacune",
+                "2 conseils IA pour booster ton profil",
+            ],
+        },
+        "ELITE": {
+            "cadence": "chaque matin à 7h",
+            "avantages": [
+                "Tes missions <strong>chaque matin à 7h</strong> (veille quotidienne)",
+                "Des <strong>alertes immédiates à 8h45 et 18h45</strong> dès qu'une mission à fort match apparaît",
+                "Les <strong>10 meilleures missions</strong> — deux fois plus qu'en ENTRY",
+                "Un score de compatibilité sur 100 pour chacune",
+                "2 conseils IA pour booster ton profil",
+            ],
+        },
+    }
+
+    def _avantages_list(self, palette, avantages: list[str]) -> str:
+        items = "".join(
+            f'<li style="margin:0 0 9px 0;padding-left:4px;">{a}</li>' for a in avantages
+        )
+        return (
+            f'<ul style="color:{palette.text};line-height:1.65;font-size:14px;'
+            f'margin:4px 0 18px 0;padding-left:20px;">{items}</ul>'
+        )
+
     def send_welcome_email(self, individual: Individual) -> bool:
-        """Envoie un email de bienvenue au particulier."""
+        """Email d'accueil, adapte au plan reellement choisi."""
         if not individual.email:
             return False
 
-        plan = (individual.subscription_plan or "PASS").upper()
-        plan_base = plan.replace("PENDING_", "")
-        is_pending = plan.startswith("PENDING_")
-
-        subject = f"Bienvenue sur NOBILIS X, {individual.full_name.split()[0]} !"
-        clean_name = self._clean_text(individual.full_name.split()[0])
+        plan = plan_base(individual)
+        pending = is_pending(individual)
+        first_name = self._clean_text(individual.full_name.split()[0])
         clean_domain = self._clean_text(individual.domain)
+        details = self.PLAN_DETAILS.get(plan, self.PLAN_DETAILS["ENTRY"])
+        expires = getattr(individual, "subscription_expires_at", None)
+        expires_str = expires.strftime("%d/%m/%Y") if expires else None
+        P = tpl.INDIVIDUAL
 
-        if is_pending:
-            amount = "1 500 000" if plan_base == "ELITE" else "1 000 000"
-            message_body = f"""
-    <p style="color:#e2e8f0;line-height:1.7;font-size:14px;">Ta pre-inscription pour le plan <strong style="color:#a78bfa;">NOBILIS {plan_base}</strong> est enregistree.</p>
-    <div style="background:rgba(124,58,237,0.1);border:1px solid #7c3aed;padding:18px;border-radius:12px;margin:20px 0;">
-        <h3 style="color:#a78bfa;margin-top:0;font-size:16px;">Action requise : Paiement Orange Money</h3>
-        <p style="color:#fff;line-height:1.6;margin-bottom:0;font-size:14px;">Pour activer ton abonnement et recevoir tes missions chaque lundi, fais un depot de <strong>{amount} GNF</strong> au :</p>
-        <p style="color:#a78bfa;font-size:22px;font-weight:bold;text-align:center;margin:12px 0;">+224 627 27 13 97</p>
-        <p style="color:#94a3b8;font-size:12px;margin:0;text-align:center;">Precise "NOBILIS" ou envoie la capture du paiement sur WhatsApp a ce numero.</p>
-    </div>
-            """
+        # ── 1. Pré-inscription : paiement attendu ──
+        if pending:
+            amount = "1 500 000" if plan == "ELITE" else "1 000 000"
+            subject = f"NOBILIS X - Active ton abonnement {plan}, {individual.full_name.split()[0]}"
+            heading = f"Salut {first_name} !"
+            body = (
+                tpl.paragraph(P, f"Ta pré-inscription au plan <strong>NOBILIS {plan}</strong> est enregistrée.")
+                + tpl.paragraph(P, f"Dès l'activation, voici ce que tu reçois pour <strong>{clean_domain}</strong> :")
+                + self._avantages_list(P, details["avantages"])
+                + tpl.action_box(
+                    P,
+                    heading="Dernière étape : le paiement",
+                    intro="Fais un dépôt Orange Money de",
+                    amount=amount,
+                    footnote="Précise « NOBILIS » lors du dépôt, puis envoie la capture sur WhatsApp. Ton compte est activé dans la foulée.",
+                )
+                + tpl.paragraph(P, "Tu recevras un email de confirmation dès que ton paiement sera validé.")
+            )
+            preheader = f"Plus qu'un dépôt de {amount} GNF pour activer ton abonnement {plan}."
+
+        # ── 2. Essai gratuit ──
+        elif plan == "PASS":
+            subject = f"NOBILIS X - Ton essai gratuit de {PASS_TRIAL_DAYS} jours a commencé"
+            heading = f"Salut {first_name} !"
+            body = (
+                tpl.paragraph(P, f"Ton <strong>essai gratuit de {PASS_TRIAL_DAYS} jours</strong> démarre maintenant. Rien à payer.")
+                + tpl.paragraph(P, f"Pendant cette période, tu reçois pour <strong>{clean_domain}</strong> :")
+                + self._avantages_list(P, details["avantages"])
+                + tpl.info_box(
+                    P,
+                    (f"Ton essai se termine le <strong>{expires_str}</strong>. " if expires_str else "")
+                    + "On te préviendra avant la fin. Ensuite, l'accès s'arrête tant qu'un plan "
+                    "ENTRY ou ELITE n'est pas activé.",
+                )
+                + tpl.paragraph(P, "<strong>NOBILIS ENTRY</strong> — 1 000 000 GNF/an : 5 missions chaque lundi.<br>"
+                                   "<strong>NOBILIS ELITE</strong> — 1 500 000 GNF/an : 10 missions chaque jour et alertes immédiates.")
+            )
+            preheader = f"Ton essai gratuit de {PASS_TRIAL_DAYS} jours est actif."
+
+        # ── 3. Abonnement payant actif ──
         else:
-            message_body = f"""
-    <p style="color:#e2e8f0;line-height:1.7;font-size:14px;"><strong>C'est bon, ton paiement a été validé ! Ton compte NOBILIS {plan_base} est maintenant 100% actif.</strong></p>
-    <p style="color:#e2e8f0;line-height:1.7;font-size:14px;">Chaque <strong>lundi à 7h</strong>, tu recevras par mail tes meilleures missions 100% en ligne (télétravail) en <strong style="color:#fff;">{clean_domain}</strong> avec un score de compatibilité personnalisé.</p>
-    <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.3);padding:14px 18px;border-radius:10px;margin:16px 0;">
-        <p style="color:#c4b5fd;font-size:13px;margin:0;line-height:1.5;">💡 <strong>Astuce :</strong> Surveille bien ta boîte mail lundi matin à 7h00 précise !</p>
-    </div>
-            """
+            subject = f"NOBILIS X - Ton abonnement {plan} est actif, {individual.full_name.split()[0]}"
+            heading = f"Ton abonnement {plan} est actif"
+            body = (
+                tpl.paragraph(P, f"<strong>C'est bon {first_name} !</strong> Ton paiement a été validé et ton compte <strong>NOBILIS {plan}</strong> est actif.")
+                + tpl.paragraph(P, f"Concrètement, pour <strong>{clean_domain}</strong>, tu reçois :")
+                + self._avantages_list(P, details["avantages"])
+                + tpl.info_box(
+                    P,
+                    (f"Abonnement valable jusqu'au <strong>{expires_str}</strong>. " if expires_str else "")
+                    + "On te préviendra 7 jours puis 3 jours avant l'échéance.",
+                )
+                + tpl.paragraph(P, f"Ton premier rapport arrive <strong>{details['cadence']}</strong>.")
+            )
+            preheader = f"Ton abonnement NOBILIS {plan} est actif — missions {details['cadence']}."
 
-        html_body = f"""<!DOCTYPE html>
-<html lang="fr"><body style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;background:#0f0b2e;color:#fff;">
-    <div style="max-width:500px;margin:0 auto;background:#1e1b4b;padding:40px;border-radius:20px;border:1px solid #312e81;">
-    <h1 style="color:#a78bfa;font-size:26px;margin:0 0 4px 0;font-weight:900;">NOBILIS X</h1>
-    <p style="color:#6366f1;font-size:11px;margin:0 0 24px 0;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;">Missions 100% en Ligne</p>
-    <h2 style="color:#fff;font-size:20px;font-weight:800;">Salut {clean_name} !</h2>
-    {message_body}
-    <hr style="border:1px solid #312e81;margin:24px 0;">
-    <p style="color:#6366f1;font-size:12px;">trillionnx@gmail.com | +224 627 27 13 97</p>
-    <p style="color:#4338ca;font-size:11px;">Fait en Guinee. Concu pour que les meilleurs gagnent.</p>
-    </div>
-</body></html>"""
-
-        email_log = EmailLog(
-            individual_id=individual.id,
-            recipient_email=individual.email,
-            subject=self._clean_subject(subject),
-            status="pending",
-        )
-        self.db.add(email_log)
-        self.db.flush()
-
-        try:
-            self._send_email_intelligent(individual.email, subject, html_body)
-            email_log.status = "sent"
-            email_log.sent_at = datetime.utcnow()
-            self.db.commit()
-            return True
-        except Exception as e:
-            email_log.status = "failed"
-            email_log.error_message = str(e)[:500]
-            self.db.commit()
-            return False
+        html_body = tpl.render(P, heading=heading, body_html=body, preheader=preheader)
+        return self._dispatch(individual, subject, html_body)
 
     def send_expiration_reminder(self, individual: Individual, days_left: int) -> bool:
         """Envoie un rappel d'expiration au particulier."""

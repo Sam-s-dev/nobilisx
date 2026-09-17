@@ -5,6 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NOBILIS X — Système Expert de Veille & Analyse des Appels d'Offres</title>
     <meta name="description" content="NOBILIS X : L'intelligence des marchés publics en Guinée. Surveillance centralisée, analyse IA, Indice de Crédibilité — Ne manquez plus jamais un contrat.">
+
+    <!-- Application installable (PWA) — icône : le N seul du logo NobilisX -->
+    <link rel="manifest" href="/static/manifest.webmanifest">
+    <meta name="theme-color" content="#7c3aed">
+    <link rel="icon" href="/static/icons/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/favicon-192.png">
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="NobilisX">
+    <meta name="application-name" content="NobilisX">
+
+    <!-- Partage sur les réseaux et messageries (WhatsApp) -->
+    <meta property="og:title" content="NOBILIS X — L'intelligence des marchés">
+    <meta property="og:description" content="Veille et analyse des appels d'offres et missions en Guinée.">
+    <meta property="og:image" content="/static/logo.png">
+    <meta property="og:type" content="website">
+
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
@@ -80,9 +99,7 @@
         .navbar {
             position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
             padding: 14px 40px;
-            background: rgba(245,243,255,0.80);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
+            background: #ffffff;
             border-bottom: 1px solid var(--border);
             display: flex; align-items: center; justify-content: space-between;
             transition: var(--transition);
@@ -93,15 +110,18 @@
             text-decoration: none;
         }
 
+        /* Symbole N du logo NobilisX, sur fond blanc comme le reste de la barre */
         .brand-icon {
-            width: 40px; height: 40px;
-            background: linear-gradient(135deg, var(--violet-mid), var(--indigo));
-            border-radius: 12px;
+            width: 42px; height: 42px;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 4px 16px rgba(124,58,237,0.3);
+            flex-shrink: 0;
         }
 
-        .brand-icon i { color: #fff; }
+        .brand-icon img {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            display: block;
+        }
 
         .brand-text-wrap { display: flex; flex-direction: column; }
 
@@ -1068,7 +1088,7 @@
     <nav class="navbar">
         <a href="#" class="navbar-brand">
             <div class="brand-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <img src="/static/icons/icon-192.png" alt="NobilisX" width="42" height="42">
             </div>
             <div class="brand-text-wrap">
                 <div class="brand-name">NOBILIS X</div>
@@ -2115,6 +2135,46 @@
                 });
             }
         });
+    </script>
+
+    <!-- Installation de l'application (PWA) -->
+    <script>
+        // Enregistrement du service worker : c'est lui qui rend l'application
+        // installable sur le telephone et qui affiche une page de secours hors ligne.
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/static/sw.js', { scope: '/' })
+                    .catch(function (e) { console.warn('Service worker non enregistre :', e); });
+            });
+        }
+
+        // Bouton d'installation : Chrome/Edge/Android emettent beforeinstallprompt.
+        // iOS ne le fait pas, on y guide l'utilisateur a la main.
+        (function () {
+            var deferredPrompt = null;
+            var btn = document.getElementById('installApp');
+
+            window.addEventListener('beforeinstallprompt', function (e) {
+                e.preventDefault();
+                deferredPrompt = e;
+                if (btn) btn.style.display = 'inline-flex';
+            });
+
+            if (btn) {
+                btn.addEventListener('click', function () {
+                    if (!deferredPrompt) return;
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.finally(function () {
+                        deferredPrompt = null;
+                        btn.style.display = 'none';
+                    });
+                });
+            }
+
+            window.addEventListener('appinstalled', function () {
+                if (btn) btn.style.display = 'none';
+            });
+        })();
     </script>
 </body>
 </html>
