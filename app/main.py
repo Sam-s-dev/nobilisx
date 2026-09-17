@@ -71,33 +71,24 @@ async def lifespan(app: FastAPI):
     init_db()
     logger.info("✅ Base de données initialisée")
 
-    # Valider la configuration SMTP/Mailjet
-    if not settings.SMTP_FROM:
-        logger.warning("⚠️" * 30)
-        logger.warning("⚠️ SMTP_FROM non défini : Les e-mails ne pourront pas s'envoyer !")
-        logger.warning("⚠️" * 30)
-    else:
-        logger.info(f"📧 Expéditeur email : {settings.SMTP_FROM}")
+    # Valider la configuration d'envoi d'emails (voir app/services/email_sender.py)
+    from app.services.email_sender import describe_config
 
-    # Vérifier la méthode d'envoi disponible
-    if settings.MAILJET_API_KEY and settings.MAILJET_SECRET_KEY:
-        logger.info("✅ Mailjet HTTP API configurée (HTTPS port 443) — Méthode prioritaire")
-        logger.info(f"   MAILJET_API_KEY: {settings.MAILJET_API_KEY[:8]}...")
+    email_config = describe_config()
+    logger.info(f"📧 Expéditeur email : {email_config['from_email'] or '(aucun)'}")
+
+    if email_config["available"]:
+        logger.info(
+            f"✅ Fournisseur actif : {email_config['active_provider']} "
+            f"(secours : {', '.join(email_config['available'][1:]) or 'aucun'})"
+        )
     else:
-        logger.warning("⚠️ MAILJET_API_KEY / MAILJET_SECRET_KEY non définis")
-        if settings.SMTP_HOST and settings.SMTP_HOST != "in-v3.mailjet.com":
-            logger.warning(
-                f"   SMTP configuré vers {settings.SMTP_HOST}:{settings.SMTP_PORT} "
-                "— peut échouer sur Render/cloud (ports SMTP bloqués)"
-            )
-            logger.warning(
-                "   💡 Créez un compte gratuit sur https://www.mailjet.com et ajoutez "
-                "MAILJET_API_KEY + MAILJET_SECRET_KEY dans les variables d'environnement"
-            )
-        if settings.SMTP_USER and settings.SMTP_PASSWORD:
-            logger.info(f"   SMTP fallback: {settings.SMTP_HOST}:{settings.SMTP_PORT} (utilisera SMTP si API indisponible)")
-        else:
-            logger.warning("   ⚠️ SMTP_USER / SMTP_PASSWORD non définis — aucune méthode d'envoi disponible !")
+        logger.warning("⚠️" * 30)
+        logger.warning("⚠️ Aucun fournisseur d'email configuré : les envois échoueront !")
+        logger.warning("⚠️" * 30)
+
+    for warning in email_config["warnings"]:
+        logger.warning(f"   ⚠️ {warning}")
 
     # Démarrer le scheduler
     init_scheduler()
